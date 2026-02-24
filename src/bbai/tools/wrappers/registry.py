@@ -35,7 +35,6 @@ class ToolRegistry:
             # Port scanning
             "port_scan": [
                 PythonPortScanner(),  # Pure Python
-                # NaabuWrapper(),  # Binary (TODO)
             ],
             
             # Content discovery
@@ -68,16 +67,7 @@ class ToolRegistry:
                 PythonHttpx(),   # Pure Python (fallback)
             ],
             
-            # SSL/TLS analysis
-            "ssl_scan": [
-                # PythonSSLAnalyzer(),  # Pure Python (TODO)
-            ],
-            
-            # Secret scanning
-            "secret_scan": [
-                # TruffleHogWrapper(),  # Binary (TODO)
-                # GitLeaksWrapper(),  # Binary (TODO)
-            ],
+
         }
 
     def get_tools(self, category: str) -> list[ToolWrapper]:

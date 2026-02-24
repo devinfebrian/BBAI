@@ -14,7 +14,7 @@ from typing import Any
 
 import aiosqlite
 
-from bbai.core.config_models import AgentState, SafetyEvent, ToolOutput, Vulnerability
+from bbai.core.config_models import SafetyEvent, ToolOutput, Vulnerability
 
 
 class StateManager:

@@ -335,8 +335,6 @@ class SafetyNode:
         Returns:
             Updated state with safety check results
         """
-        from bbai.core.config_models import AgentState
-
         config = state.get("config")
         target = state.get("target")
         

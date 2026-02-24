@@ -4,8 +4,8 @@ This package contains the core safety, configuration, and state management
 modules for BBAI.
 """
 
+from bbai.agent.agent import AgentState
 from bbai.core.config_models import (
-    AgentState,
     BBAIConfig,
     LLMProvider,
     LLMProviderConfig,
