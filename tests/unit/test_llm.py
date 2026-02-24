@@ -5,40 +5,40 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from bbai.llm.client import (
+from bbai.llm.providers import (
     AnalysisResult,
-    KimiClient,
     LLMResponse,
-    MockKimiClient,
+    MockLLMClient,
+    MoonshotClient,
 )
 from bbai.llm.schemas import VulnerabilityAnalysis
 
 
-class TestKimiClient:
-    """Test KimiClient functionality."""
+class TestMoonshotClient:
+    """Test MoonshotClient (formerly KimiClient) functionality."""
 
     def test_init_with_api_key(self):
         """Test initialization with explicit API key."""
-        client = KimiClient(api_key="test-key")
+        client = MoonshotClient(api_key="test-key")
         assert client.api_key == "test-key"
         assert client.model == "kimi-k2-5"
 
     def test_init_with_env_var(self, monkeypatch):
         """Test initialization with environment variable."""
         monkeypatch.setenv("MOONSHOT_API_KEY", "env-key")
-        client = KimiClient()
+        client = MoonshotClient()
         assert client.api_key == "env-key"
 
     def test_init_without_api_key_raises(self, monkeypatch):
         """Test that initialization fails without API key."""
         monkeypatch.delenv("MOONSHOT_API_KEY", raising=False)
         with pytest.raises(ValueError, match="API key required"):
-            KimiClient()
+            MoonshotClient()
 
     @pytest.mark.asyncio
     async def test_complete_success(self):
         """Test successful completion."""
-        client = KimiClient(api_key="test-key")
+        client = MoonshotClient(api_key="test-key")
         
         mock_response = Mock()
         mock_response.json.return_value = {
@@ -64,7 +64,7 @@ class TestKimiClient:
     @pytest.mark.asyncio
     async def test_complete_with_system_prompt(self):
         """Test completion with system prompt."""
-        client = KimiClient(api_key="test-key")
+        client = MoonshotClient(api_key="test-key")
         
         mock_response = Mock()
         mock_response.json.return_value = {
@@ -95,7 +95,7 @@ class TestKimiClient:
     @pytest.mark.asyncio
     async def test_analyze_finding(self):
         """Test vulnerability analysis."""
-        client = KimiClient(api_key="test-key")
+        client = MoonshotClient(api_key="test-key")
         
         analysis_result = {
             "reasoning": "This is clearly an XSS vulnerability.",
@@ -139,7 +139,7 @@ class TestKimiClient:
     @pytest.mark.asyncio
     async def test_analyze_finding_fallback(self):
         """Test analysis with invalid JSON response."""
-        client = KimiClient(api_key="test-key")
+        client = MoonshotClient(api_key="test-key")
         
         mock_response = Mock()
         mock_response.json.return_value = {
@@ -167,7 +167,7 @@ class TestKimiClient:
     @pytest.mark.asyncio
     async def test_analyze_batch(self):
         """Test batch analysis."""
-        client = KimiClient(api_key="test-key")
+        client = MoonshotClient(api_key="test-key")
         
         mock_response = Mock()
         mock_response.json.return_value = {
@@ -204,7 +204,7 @@ class TestKimiClient:
     @pytest.mark.asyncio
     async def test_generate_summary(self):
         """Test summary generation."""
-        client = KimiClient(api_key="test-key")
+        client = MoonshotClient(api_key="test-key")
         
         mock_response = Mock()
         mock_response.json.return_value = {
@@ -228,24 +228,24 @@ class TestKimiClient:
         assert summary == "Executive summary here."
 
 
-class TestMockKimiClient:
-    """Test MockKimiClient for testing."""
+class TestMockLLMClient:
+    """Test MockLLMClient for testing."""
 
     @pytest.mark.asyncio
     async def test_mock_complete(self):
         """Test mock completion."""
-        client = MockKimiClient()
+        client = MockLLMClient()
         
         response = await client.complete("Test prompt")
         
         assert isinstance(response, LLMResponse)
-        assert response.content == "Mock response from Kimi K2.5"
+        assert "Mock response from" in response.content
         assert response.confidence == 0.85
 
     @pytest.mark.asyncio
     async def test_mock_json_mode(self):
         """Test mock JSON response."""
-        client = MockKimiClient()
+        client = MockLLMClient()
         
         response = await client.complete("Test", json_mode=True)
         
@@ -256,7 +256,7 @@ class TestMockKimiClient:
     @pytest.mark.asyncio
     async def test_mock_analyze_finding(self):
         """Test mock analysis."""
-        client = MockKimiClient()
+        client = MockLLMClient()
         
         result = await client.analyze_finding({"type": "XSS"})
         

@@ -402,32 +402,44 @@ class MoonshotClient(BaseLLMClient):
         return models
     
     def _get_moonshot_model_description(self, model_id: str) -> str:
-        """Get description for Moonshot model."""
-        descriptions = {
-            "kimi-k2.5": "Kimi K2.5 - State-of-the-art with 256K context",
-            "kimi-k2-thinking": "Kimi K2.5 Thinking - Extended reasoning mode",
-            "kimi-k2-turbo-preview": "Kimi K2 Turbo Preview - Fast and efficient",
-            "kimi-k1.5": "Kimi K1.5 - Long context specialist",
-            "kimi-k1": "Kimi K1 - Long context model",
-        }
-        for key, desc in descriptions.items():
-            if key in model_id.lower():
-                return desc
+        """Get description for Moonshot model using pattern matching.
+        
+        Handles known models and provides generic descriptions for new variants.
+        """
+        model_id_lower = model_id.lower()
+        
+        # Pattern-based matching for flexibility with new model variants
+        if "k2.5" in model_id_lower or "k2-5" in model_id_lower:
+            if "thinking" in model_id_lower:
+                return "Kimi K2.5 Thinking - Extended reasoning mode"
+            return "Kimi K2.5 - State-of-the-art with 256K context"
+        elif "k2-turbo" in model_id_lower or "k2-turbo" in model_id_lower:
+            return "Kimi K2 Turbo - Fast and efficient"
+        elif "k1.5" in model_id_lower or "k1-5" in model_id_lower:
+            return "Kimi K1.5 - Long context specialist"
+        elif "k1" in model_id_lower:
+            return "Kimi K1 - Long context model"
+        
         return "Moonshot AI model"
     
     def _moonshot_model_priority(self, model_id: str) -> int:
-        """Get priority for sorting (higher = first)."""
-        priorities = {
-            "kimi-k2.5": 100,
-            "kimi-k2-thinking": 95,
-            "kimi-k2-turbo": 90,
-            "kimi-k1.5": 80,
-            "kimi-k1": 70,
-        }
-        for key, priority in priorities.items():
-            if key in model_id.lower():
-                return priority
-        return 0
+        """Get priority for sorting (higher = first).
+        
+        Uses pattern matching to handle new model variants.
+        """
+        model_id_lower = model_id.lower()
+        
+        # Pattern-based priority (newer/better models = higher priority)
+        if "k2.5" in model_id_lower or "k2-5" in model_id_lower:
+            return 100 if "thinking" not in model_id_lower else 95
+        elif "k2-turbo" in model_id_lower:
+            return 90
+        elif "k1.5" in model_id_lower or "k1-5" in model_id_lower:
+            return 80
+        elif "k1" in model_id_lower:
+            return 70
+        
+        return 0  # Unknown models at the end
 
 
 class OpenAIClient(BaseLLMClient):
@@ -496,55 +508,74 @@ class OpenAIClient(BaseLLMClient):
         return models
     
     def _get_openai_model_description(self, model_id: str) -> str:
-        """Get description for OpenAI model."""
-        descriptions = {
-            "gpt-4o": "Most capable multimodal model (GPT-4 Optimized)",
-            "gpt-4o-mini": "Fast, cost-effective multimodal model",
-            "o3-mini": "Reasoning model optimized for coding and STEM",
-            "o1": "Advanced reasoning model",
-            "o1-mini": "Faster reasoning model",
-            "gpt-4-turbo": "Previous generation GPT-4",
-            "gpt-4": "Original GPT-4",
-            "gpt-3.5-turbo": "Fast, cost-effective for simple tasks",
-        }
-        for key, desc in descriptions.items():
-            if key in model_id:
-                return desc
+        """Get description for OpenAI model using pattern matching.
+        
+        Handles known models and provides generic descriptions for new variants.
+        """
+        model_id_lower = model_id.lower()
+        
+        # Pattern-based matching for flexibility with new model variants
+        if "gpt-4o" in model_id_lower:
+            if "mini" in model_id_lower:
+                return "GPT-4o Mini - Fast, cost-effective multimodal model"
+            return "GPT-4o - Most capable multimodal model"
+        elif "o3" in model_id_lower:
+            if "mini" in model_id_lower:
+                return "o3-mini - Reasoning model for coding and STEM"
+            return "o3 - Advanced reasoning model"
+        elif "o1" in model_id_lower:
+            if "mini" in model_id_lower:
+                return "o1-mini - Faster reasoning model"
+            return "o1 - Advanced reasoning model"
+        elif "gpt-4-turbo" in model_id_lower:
+            return "GPT-4 Turbo - Previous generation GPT-4"
+        elif "gpt-4" in model_id_lower:
+            return "GPT-4 - Original GPT-4 model"
+        elif "gpt-3.5" in model_id_lower:
+            return "GPT-3.5 Turbo - Fast, cost-effective for simple tasks"
+        
         return "OpenAI model"
     
     def _get_openai_context_length(self, model_id: str) -> int:
-        """Get context length for OpenAI model."""
-        context_lengths = {
-            "gpt-4o": 128000,
-            "gpt-4o-mini": 128000,
-            "o3-mini": 200000,
-            "o1": 200000,
-            "o1-mini": 128000,
-            "gpt-4-turbo": 128000,
-            "gpt-4": 8192,
-            "gpt-3.5-turbo": 16385,
-        }
-        for key, length in context_lengths.items():
-            if key in model_id:
-                return length
-        return 4096  # Default
+        """Get context length for OpenAI model using pattern matching."""
+        model_id_lower = model_id.lower()
+        
+        # Pattern-based context lengths
+        if any(x in model_id_lower for x in ["gpt-4o", "o1-mini"]):
+            return 128000
+        elif any(x in model_id_lower for x in ["o3", "o1-"]):
+            return 200000  # o3 and o1 (non-mini)
+        elif "gpt-4-turbo" in model_id_lower:
+            return 128000
+        elif "gpt-4" in model_id_lower:
+            return 8192
+        elif "gpt-3.5" in model_id_lower:
+            return 16385
+        
+        return 128000  # Default for new models (most modern models support 128K)
     
     def _openai_model_priority(self, model_id: str) -> int:
-        """Get priority for sorting (higher = first)."""
-        priorities = {
-            "gpt-4o": 100,
-            "o3-mini": 95,
-            "o1": 90,
-            "gpt-4o-mini": 85,
-            "o1-mini": 80,
-            "gpt-4-turbo": 70,
-            "gpt-4": 60,
-            "gpt-3.5-turbo": 50,
-        }
-        for key, priority in priorities.items():
-            if key in model_id:
-                return priority
-        return 0
+        """Get priority for sorting (higher = first).
+        
+        Uses pattern matching to handle new model variants.
+        """
+        model_id_lower = model_id.lower()
+        
+        # Pattern-based priority (better models = higher priority)
+        if "gpt-4o" in model_id_lower:
+            return 85 if "mini" in model_id_lower else 100
+        elif "o3" in model_id_lower:
+            return 90 if "mini" not in model_id_lower else 88
+        elif "o1" in model_id_lower:
+            return 85 if "mini" not in model_id_lower else 80
+        elif "gpt-4-turbo" in model_id_lower:
+            return 70
+        elif "gpt-4" in model_id_lower:
+            return 60
+        elif "gpt-3.5" in model_id_lower:
+            return 50
+        
+        return 0  # Unknown models at the end
 
 
 class AnthropicClient(BaseLLMClient):
@@ -715,22 +746,50 @@ class OllamaClient(BaseLLMClient):
         return models
     
     def _get_ollama_model_description(self, model_id: str) -> str:
-        """Get description for Ollama model."""
-        descriptions = {
-            "llama3.3": "Meta's Llama 3.3 70B - State-of-the-art open model",
-            "llama3.2": "Meta's Llama 3.2 (1B-3B) - Lightweight, efficient",
-            "llama3.1": "Meta's Llama 3.1 (8B-405B) - Strong general performance",
-            "qwen2.5": "Alibaba's Qwen 2.5 - Excellent multilingual model",
-            "deepseek-r1": "DeepSeek-R1 - Reasoning-focused model",
-            "codellama": "Meta's CodeLlama - Code-specialized model",
-            "mistral": "Mistral AI's model - Strong performance",
-            "mixtral": "Mistral's MoE model - Powerful but large",
-            "phi4": "Microsoft's Phi-4 - Small but capable",
-            "gemma2": "Google's Gemma 2 - Open models by Google",
-        }
-        for key, desc in descriptions.items():
-            if key in model_id.lower():
-                return desc
+        """Get description for Ollama model using pattern matching.
+        
+        Handles known models and provides generic descriptions for new variants.
+        """
+        model_id_lower = model_id.lower()
+        
+        # Pattern-based matching for flexibility with new model variants
+        if "llama3.3" in model_id_lower:
+            return "Meta's Llama 3.3 70B - State-of-the-art open model"
+        elif "llama3.2" in model_id_lower:
+            return "Meta's Llama 3.2 (1B-3B) - Lightweight, efficient"
+        elif "llama3.1" in model_id_lower:
+            return "Meta's Llama 3.1 (8B-405B) - Strong general performance"
+        elif "llama3" in model_id_lower:
+            return "Meta's Llama 3 - Modern open model"
+        elif "llama2" in model_id_lower:
+            return "Meta's Llama 2 - Previous generation open model"
+        elif "qwen2.5" in model_id_lower or "qwen2-5" in model_id_lower:
+            return "Alibaba's Qwen 2.5 - Excellent multilingual model"
+        elif "qwen2" in model_id_lower:
+            return "Alibaba's Qwen 2 - Strong multilingual model"
+        elif "deepseek-r1" in model_id_lower:
+            return "DeepSeek-R1 - Reasoning-focused model"
+        elif "deepseek" in model_id_lower:
+            return "DeepSeek - Open reasoning model"
+        elif "codellama" in model_id_lower:
+            return "Meta's CodeLlama - Code-specialized model"
+        elif "mixtral" in model_id_lower:
+            return "Mistral's Mixtral MoE - Powerful but large"
+        elif "mistral" in model_id_lower:
+            return "Mistral AI's model - Strong performance"
+        elif "phi4" in model_id_lower:
+            return "Microsoft's Phi-4 - Small but capable"
+        elif "phi3" in model_id_lower:
+            return "Microsoft's Phi-3 - Efficient small model"
+        elif "gemma2" in model_id_lower or "gemma-2" in model_id_lower:
+            return "Google's Gemma 2 - Open models by Google"
+        elif "gemma" in model_id_lower:
+            return "Google's Gemma - Open models by Google"
+        elif "command" in model_id_lower:
+            return "Cohere's Command model - Enterprise-focused"
+        elif "dolphin" in model_id_lower:
+            return "Dolphin - Uncensored conversational model"
+        
         return "Local Ollama model"
     
     def _get_ollama_context_length(self, model_id: str) -> int:
