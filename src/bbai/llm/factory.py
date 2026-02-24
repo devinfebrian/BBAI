@@ -45,7 +45,6 @@ class LLMProvider(str, Enum):
     @classmethod
     def get_default_models(cls, provider: str) -> list[str]:
         """Get default models for a provider."""
-        # Updated: 2025-02 with latest model versions
         models = {
             cls.MOONSHOT: ["kimi-k2.5", "kimi-k2-thinking", "kimi-k2-turbo-preview"],
             cls.OPENAI: ["gpt-4o", "o3-mini", "gpt-4o-mini"],

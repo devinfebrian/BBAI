@@ -84,12 +84,12 @@ def investigate(
     ))
     
     # Validate target is in scope
-    is_valid, reason = safety_manager.validate_target(target)
-    if not is_valid:
-        console.print(f"[red]✗ Target validation failed: {reason}[/]")
+    validation_result = safety_manager.validate_target(target)
+    if not validation_result.allowed:
+        console.print(f"[red]X Target validation failed: {validation_result.reason}[/]")
         raise typer.Exit(1)
     
-    console.print(f"[green]✓ Target validation passed[/]\n")
+    console.print(f"[green]OK Target validation passed[/]\n")
     
     # Run the agent
     async def run_investigation():
@@ -136,7 +136,7 @@ def investigate(
         # Save or display report
         if output:
             output.write_text(report)
-            console.print(f"\n[green]✓ Report saved to:[/] {output}")
+            console.print(f"\n[green]OK Report saved to:[/] {output}")
         else:
             console.print("\n[bold]Report:[/]")
             console.print(report)

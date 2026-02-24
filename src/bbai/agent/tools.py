@@ -17,7 +17,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, ClassVar, TypeVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from bbai.tools.wrappers.base import BinaryToolWrapper
 from bbai.tools.wrappers.subfinder import SubfinderWrapper
@@ -256,6 +256,8 @@ OutputT = TypeVar("OutputT", bound=BaseModel)
 
 class AgentTool(ABC, BaseModel):
     """Base class for tools the AI agent can call."""
+    
+    model_config = ConfigDict(extra="allow")
     
     name: ClassVar[str]
     description: ClassVar[str]

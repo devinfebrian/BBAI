@@ -226,7 +226,7 @@ class SecurityAgent:
             current_focus=target
         )
         
-        self.console.print(f"\n[bold cyan]🔍 Starting investigation of {target}[/]")
+        self.console.print(f"\n[bold cyan]>> Starting investigation of {target}[/]")
         self.console.print(f"[dim]Press Ctrl+C to stop gracefully\n")
         
         # Create progress display
@@ -237,7 +237,7 @@ class SecurityAgent:
             
             # Progress bar
             progress_pct = min(100, int(len(state.tool_calls) / self.max_iterations * 100))
-            bar = "█" * (progress_pct // 5) + "░" * (20 - progress_pct // 5)
+            bar = "#" * (progress_pct // 5) + "-" * (20 - progress_pct // 5)
             table.add_row("Progress", f"{bar} {progress_pct}%")
             table.add_row("Strategy", f"[yellow]{state.strategy.value}[/]")
             table.add_row("Hosts", str(len(state.hosts)))
@@ -264,7 +264,7 @@ class SecurityAgent:
                 try:
                     decision = await self._think(state)
                 except Exception as e:
-                    self.console.print(f"\n[yellow]⚠ AI decision failed: {e}[/]")
+                    self.console.print(f"\n[yellow]! AI decision failed: {e}[/]")
                     self.console.print("[dim]Retrying with simplified prompt...[/]")
                     continue
                 
@@ -281,7 +281,7 @@ class SecurityAgent:
                     # Show what we're doing
                     tool_name = decision.tool_decision.tool_name
                     live.stop()
-                    self.console.print(f"[dim]→[/] [blue]{tool_name}[/] - {decision.reasoning[:60]}...")
+                    self.console.print(f"[dim]->[/] [blue]{tool_name}[/] - {decision.reasoning[:60]}...")
                     live.start()
                     
                     await self._execute_tool(state, decision.tool_decision)
@@ -296,11 +296,11 @@ class SecurityAgent:
         # Final summary
         self.console.print()
         if state.halt_requested:
-            self.console.print(f"[yellow]⏹ Investigation halted:[/] {state.halt_reason}")
+            self.console.print(f"[yellow]STOP Investigation halted:[/] {state.halt_reason}")
         elif iteration >= self.max_iterations:
-            self.console.print(f"[yellow]⚠ Reached max iterations ({self.max_iterations})[/]")
+            self.console.print(f"[yellow]! Reached max iterations ({self.max_iterations})[/]")
         else:
-            self.console.print("[green]✓ Investigation complete[/]")
+            self.console.print("[green]OK Investigation complete[/]")
         
         return state
     
@@ -403,7 +403,7 @@ Make your decision now:"""
     
     async def _execute_tool(self, state: AgentState, decision: ToolDecision) -> None:
         """Execute a tool and update state with results."""
-        self.console.print(f"[blue]▶ Running {decision.tool_name}[/]")
+        self.console.print(f"[blue]> Running {decision.tool_name}[/]")
         
         # Record the call
         state.tool_calls.append({
@@ -446,7 +446,7 @@ Make your decision now:"""
                 help_text = "This might be temporary. The AI will try a different approach."
             
             state.add_observation(error_msg)
-            self.console.print(f"\n[red]✗ {error_msg}[/]")
+            self.console.print(f"\n[red]X {error_msg}[/]")
             self.console.print(f"[dim]   {help_text}[/]")
     
     async def _process_result(
@@ -468,7 +468,7 @@ Make your decision now:"""
             
             observation = result.to_observation()
             state.add_observation(observation)
-            self.console.print(f"[green]✓ Found {result.total_found} subdomains[/]")
+            self.console.print(f"[green]OK Found {result.total_found} subdomains[/]")
         
         elif tool_name == "httpx" and isinstance(result, HttpxOutput):
             # Update host status and tech
@@ -495,7 +495,7 @@ Make your decision now:"""
             
             observation = result.to_observation()
             state.add_observation(observation)
-            self.console.print(f"[green]✓ {result.alive_count} hosts alive[/]")
+            self.console.print(f"[green]OK {result.alive_count} hosts alive[/]")
         
         elif tool_name == "katana" and isinstance(result, KatanaOutput):
             # Add endpoints
@@ -509,7 +509,7 @@ Make your decision now:"""
             
             observation = result.to_observation()
             state.add_observation(observation)
-            self.console.print(f"[green]✓ Crawled {result.total_discovered} endpoints[/]")
+            self.console.print(f"[green]OK Crawled {result.total_discovered} endpoints[/]")
             
             # If we found API endpoints, update current focus
             if result.api_endpoints:
@@ -528,7 +528,7 @@ Make your decision now:"""
             
             observation = result.to_observation()
             state.add_observation(observation)
-            self.console.print(f"[green]✓ Found {len(result.findings)} vulnerabilities[/]")
+            self.console.print(f"[green]OK Found {len(result.findings)} vulnerabilities[/]")
     
     def _format_tools(self) -> str:
         """Format tool schemas for the prompt."""
