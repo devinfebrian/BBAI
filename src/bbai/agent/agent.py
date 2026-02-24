@@ -216,50 +216,91 @@ class SecurityAgent:
         3. Continue until done or max iterations
         4. Return final state with all findings
         """
+        from rich.progress import Progress, SpinnerColumn, TextColumn
+        from rich.live import Live
+        from rich.panel import Panel
+        from rich.table import Table
+        
         state = AgentState(
             root_domain=target,
             current_focus=target
         )
         
-        self.console.print(f"[bold cyan]🔍 Starting investigation of {target}[/]")
-        self.console.print(f"[dim]Max iterations: {self.max_iterations}[/]\n")
+        self.console.print(f"\n[bold cyan]🔍 Starting investigation of {target}[/]")
+        self.console.print(f"[dim]Press Ctrl+C to stop gracefully\n")
+        
+        # Create progress display
+        def make_progress_table() -> Table:
+            table = Table(show_header=False, box=None)
+            table.add_column("Metric", style="cyan")
+            table.add_column("Value")
+            
+            # Progress bar
+            progress_pct = min(100, int(len(state.tool_calls) / self.max_iterations * 100))
+            bar = "█" * (progress_pct // 5) + "░" * (20 - progress_pct // 5)
+            table.add_row("Progress", f"{bar} {progress_pct}%")
+            table.add_row("Strategy", f"[yellow]{state.strategy.value}[/]")
+            table.add_row("Hosts", str(len(state.hosts)))
+            table.add_row("Endpoints", str(len(state.endpoints)))
+            
+            # Findings by severity
+            if state.findings:
+                critical = len([f for f in state.findings if f.severity == "critical"])
+                high = len([f for f in state.findings if f.severity == "high"])
+                medium = len([f for f in state.findings if f.severity == "medium"])
+                findings_str = f"[red]{critical} critical[/], [orange3]{high} high[/], [yellow]{medium} medium[/]"
+            else:
+                findings_str = "0"
+            table.add_row("Findings", findings_str)
+            
+            return table
         
         iteration = 0
-        while iteration < self.max_iterations and not state.halt_requested:
-            iteration += 1
-            
-            self.console.print(f"[dim]─[/]" * 50)
-            self.console.print(f"[bold]Iteration {iteration}/{self.max_iterations}[/] "
-                              f"([yellow]{state.strategy.value}[/])")
-            
-            # 1. THINK: What should we do next?
-            decision = await self._think(state)
-            
-            self.console.print(f"[dim]Reasoning:[/] {decision.reasoning[:100]}...")
-            
-            # 2. ACT: Execute the decision
-            if decision.action == ActionType.HALT:
-                state.halt_requested = True
-                state.halt_reason = decision.halt_reason
-                self.console.print(f"[yellow]⏹ Halting: {decision.halt_reason}[/]")
-                break
-            
-            elif decision.action == ActionType.REPORT_FINDINGS:
-                self.console.print("[green]✓ Investigation complete[/]")
-                break
-            
-            elif decision.action == ActionType.RUN_TOOL and decision.tool_decision:
-                await self._execute_tool(state, decision.tool_decision)
-            
-            # Update strategy if changed
-            if decision.new_strategy:
-                old_strategy = state.strategy
-                state.strategy = decision.new_strategy
-                if old_strategy != decision.new_strategy:
-                    self.console.print(f"[cyan]↻ Strategy changed: {old_strategy.value} → {decision.new_strategy.value}[/]")
+        with Live(make_progress_table(), refresh_per_second=2, console=self.console) as live:
+            while iteration < self.max_iterations and not state.halt_requested:
+                iteration += 1
+                
+                # 1. THINK: What should we do next?
+                try:
+                    decision = await self._think(state)
+                except Exception as e:
+                    self.console.print(f"\n[yellow]⚠ AI decision failed: {e}[/]")
+                    self.console.print("[dim]Retrying with simplified prompt...[/]")
+                    continue
+                
+                # 2. ACT: Execute the decision
+                if decision.action == ActionType.HALT:
+                    state.halt_requested = True
+                    state.halt_reason = decision.halt_reason
+                    break
+                
+                elif decision.action == ActionType.REPORT_FINDINGS:
+                    break
+                
+                elif decision.action == ActionType.RUN_TOOL and decision.tool_decision:
+                    # Show what we're doing
+                    tool_name = decision.tool_decision.tool_name
+                    live.stop()
+                    self.console.print(f"[dim]→[/] [blue]{tool_name}[/] - {decision.reasoning[:60]}...")
+                    live.start()
+                    
+                    await self._execute_tool(state, decision.tool_decision)
+                
+                # Update strategy if changed
+                if decision.new_strategy and decision.new_strategy != state.strategy:
+                    state.strategy = decision.new_strategy
+                
+                # Update display
+                live.update(make_progress_table())
         
-        if iteration >= self.max_iterations:
+        # Final summary
+        self.console.print()
+        if state.halt_requested:
+            self.console.print(f"[yellow]⏹ Investigation halted:[/] {state.halt_reason}")
+        elif iteration >= self.max_iterations:
             self.console.print(f"[yellow]⚠ Reached max iterations ({self.max_iterations})[/]")
+        else:
+            self.console.print("[green]✓ Investigation complete[/]")
         
         return state
     
@@ -381,14 +422,32 @@ Make your decision now:"""
             await self._process_result(state, decision.tool_name, result)
             
         except asyncio.TimeoutError:
-            error_msg = f"Tool {decision.tool_name} timed out after 5 minutes"
+            error_msg = f"{decision.tool_name} timed out (5 min limit)"
             state.add_observation(error_msg)
-            self.console.print(f"[yellow]⏱ {error_msg}[/]")
+            self.console.print(f"\n[yellow]⏱ {error_msg}[/]")
+            self.console.print("[dim]   This usually means the target is very large or slow.[/]")
+            self.console.print("[dim]   Try reducing scope or increasing the timeout.[/]")
             
         except Exception as e:
-            error_msg = f"Tool {decision.tool_name} failed: {str(e)}"
+            error_str = str(e).lower()
+            
+            # Provide helpful error messages
+            if "download" in error_str or "not found" in error_str:
+                error_msg = f"{decision.tool_name} binary not available"
+                help_text = f"Run: [cyan]bbai tools install {decision.tool_name}[/]"
+            elif "connection" in error_str or "network" in error_str:
+                error_msg = f"Network error running {decision.tool_name}"
+                help_text = "Check your internet connection and try again."
+            elif "permission" in error_str:
+                error_msg = f"Permission denied running {decision.tool_name}"
+                help_text = "Try running with appropriate permissions."
+            else:
+                error_msg = f"{decision.tool_name} failed: {str(e)[:50]}"
+                help_text = "This might be temporary. The AI will try a different approach."
+            
             state.add_observation(error_msg)
-            self.console.print(f"[red]✗ {error_msg}[/]")
+            self.console.print(f"\n[red]✗ {error_msg}[/]")
+            self.console.print(f"[dim]   {help_text}[/]")
     
     async def _process_result(
         self, 

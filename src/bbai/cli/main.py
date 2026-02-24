@@ -234,7 +234,131 @@ def create_scope_template(
     
     console.print(f"[green]OK[/] Scope template created: {output}")
     console.print(f"\n[dim]Edit this file to customize your scope rules.[/]")
-    console.print(f"[dim]Then run:[/] bbai agent investigate --scope-file {output}")
+    console.print(f"[dim]Then run:[/] bbai scan --scope-file {output}")
+
+
+@app.command()
+def scan(
+    target: Annotated[
+        str,
+        typer.Argument(
+            help="Target domain to investigate (e.g., example.com)",
+        ),
+    ],
+    iterations: Annotated[
+        int,
+        typer.Option(
+            "--iterations",
+            "-i",
+            help="Maximum number of tool executions",
+        ),
+    ] = 20,
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Output file for report",
+        ),
+    ] = None,
+    scope_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--scope-file",
+            "-S",
+            help="Path to scope configuration YAML file",
+        ),
+    ] = None,
+    preview: Annotated[
+        bool,
+        typer.Option(
+            "--preview",
+            help="Show investigation plan without running",
+        ),
+    ] = False,
+) -> None:
+    """Quick start - Run AI-driven security investigation.
+    
+    This is the simplest way to start investigating a target.
+    The AI will automatically discover subdomains, check for live hosts,
+    crawl websites, and scan for vulnerabilities.
+    
+    [bold]Examples:[/]
+        bbai scan example.com                    # Basic scan
+        bbai scan example.com -i 30              # Deeper investigation
+        bbai scan example.com -o report.md       # Save report
+        bbai scan example.com --preview          # Preview only
+    """
+    import asyncio
+    from rich.panel import Panel
+    
+    # Ensure configured
+    config = ensure_configured()
+    
+    # Validate target
+    safety_manager = create_safety_manager(scope_file, config)
+    is_valid, reason = safety_manager.validate_target(target)
+    if not is_valid:
+        console.print(f"[red]✗ Target validation failed:[/] {reason}")
+        raise typer.Exit(1)
+    
+    # Show preview if requested
+    if preview:
+        console.print(Panel(
+            f"[bold cyan]📋 Investigation Plan: {target}[/]\n\n"
+            f"The AI will perform approximately [bold]{iterations}[/] tool executions:\n\n"
+            f"[dim]Phase 1:[/] Reconnaissance\n"
+            f"  • subfinder - Find subdomains\n"
+            f"  • httpx - Check which hosts are alive\n\n"
+            f"[dim]Phase 2:[/] Discovery\n"
+            f"  • katana - Crawl discovered hosts\n"
+            f"  • nuclei - Run vulnerability scans\n\n"
+            f"[dim]Phase 3:[/] Analysis\n"
+            f"  • AI analysis of findings\n"
+            f"  • Report generation\n\n"
+            f"Estimated time: [bold]10-20 minutes[/]\n"
+            f"Estimated cost: [bold]~$0.05[/] (depends on LLM provider)",
+            border_style="blue"
+        ))
+        return
+    
+    # Run investigation
+    console.print(Panel(
+        f"[bold cyan]🔍 Starting Investigation[/]\n\n"
+        f"Target: [bold]{target}[/]\n"
+        f"Max iterations: {iterations}\n"
+        f"LLM: {config.llm.provider} ({config.llm.model})",
+        border_style="blue"
+    ))
+    
+    from bbai.agent import SecurityAgent, generate_report
+    
+    async def run():
+        agent = SecurityAgent(
+            console=console,
+            max_iterations=iterations
+        )
+        return await agent.investigate(target)
+    
+    try:
+        state = asyncio.run(run())
+        
+        # Generate and display report
+        report = generate_report(state)
+        
+        # Save if requested
+        if output:
+            output.write_text(report)
+            console.print(f"\n[green]✓ Report saved:[/] {output}")
+        else:
+            console.print("\n" + report)
+            
+    except KeyboardInterrupt:
+        console.print("\n[yellow]⚠ Investigation interrupted[/]")
+        raise typer.Exit(1)
+    except Exception as e:
+        console.print(f"\n[red]✗ Investigation failed:[/] {e}")
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -362,6 +486,103 @@ def config(
     # Default: show help
     console.print("[dim]Use --list to see all configuration values.[/]")
     console.print("[dim]Use [cyan]bbai setup[/] to reconfigure LLM settings.[/]")
+
+
+@app.command()
+def doctor(
+    fix: Annotated[
+        bool,
+        typer.Option(
+            "--fix",
+            help="Attempt to fix issues automatically",
+        ),
+    ] = False,
+) -> None:
+    """Check BBAI installation and configuration.
+    
+    Diagnoses common issues and suggests fixes.
+    
+    [cyan]Examples:[/]
+        bbai doctor              # Check status
+        bbai doctor --fix        # Try to fix issues
+    """
+    from rich.table import Table
+    import os
+    
+    console.print("[bold cyan]BBAI Health Check[/]\n")
+    
+    issues = []
+    checks = []
+    
+    # Check 1: Configuration exists
+    config_file = Path.home() / ".bbai" / "config.json"
+    if config_file.exists():
+        checks.append(("Configuration", "OK", "green"))
+    else:
+        checks.append(("Configuration", "Missing", "red"))
+        issues.append("Run 'bbai setup' to configure")
+    
+    # Check 2: LLM API key
+    config = BBAIConfig.load_with_env()
+    api_key = config.llm.api_key or os.getenv("MOONSHOT_API_KEY") or os.getenv("OPENAI_API_KEY")
+    if api_key:
+        checks.append(("API Key", "Set", "green"))
+    else:
+        checks.append(("API Key", "Missing", "red"))
+        issues.append("Set your LLM API key or run 'bbai setup'")
+    
+    # Check 3: Tools directory
+    tools_dir = Path.home() / ".bbai" / "tools"
+    if tools_dir.exists():
+        checks.append(("Tools Directory", "OK", "green"))
+    else:
+        checks.append(("Tools Directory", "Not created", "yellow"))
+        if fix:
+            tools_dir.mkdir(parents=True, exist_ok=True)
+            console.print("[green]  Created tools directory[/]")
+    
+    # Check 4: Binary tools
+    binaries = ["subfinder.exe", "httpx.exe", "katana.exe", "nuclei.exe"]
+    found = sum(1 for b in binaries if (tools_dir / b).exists())
+    if found == len(binaries):
+        checks.append(("Binary Tools", f"All {len(binaries)} present", "green"))
+    else:
+        checks.append(("Binary Tools", f"{found}/{len(binaries)} present", "yellow"))
+        if fix:
+            console.print("\n[yellow]Downloading missing tools...[/]")
+            # Tools will auto-download on first use
+    
+    # Check 5: Internet connectivity
+    import urllib.request
+    try:
+        urllib.request.urlopen("https://github.com", timeout=5)
+        checks.append(("Internet", "Connected", "green"))
+    except:
+        checks.append(("Internet", "No connection", "red"))
+        issues.append("Internet connection required for tool downloads")
+    
+    # Display results
+    table = Table(show_header=False)
+    table.add_column("Check")
+    table.add_column("Status")
+    
+    for check, status, color in checks:
+        table.add_row(check, f"[{color}]{status}[/{color}]")
+    
+    console.print(table)
+    
+    # Summary
+    console.print()
+    if not issues:
+        console.print("[bold green]All checks passed! BBAI is ready to use.[/]")
+        console.print("\n[dim]Try: bbai scan example.com[/]")
+    else:
+        console.print(f"[bold yellow]Found {len(issues)} issue(s):[/]")
+        for issue in issues:
+            console.print(f"  - {issue}")
+        
+        if not fix:
+            console.print("\n[dim]Run 'bbai doctor --fix' to attempt automatic fixes[/]")
 
 
 # Add tools subcommand

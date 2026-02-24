@@ -196,7 +196,33 @@ export MOONSHOT_API_KEY="sk-your-key-here"
 
 ## Usage
 
-### AI-Driven Investigation
+### Quick Start (Simplest)
+
+```bash
+# One-command scan - everything automatic
+bbai scan example.com
+
+# Preview what will happen (no actual scan)
+bbai scan example.com --preview
+
+# Deeper investigation
+bbai scan example.com --iterations 30
+
+# Save report
+bbai scan example.com -o report.md
+```
+
+### Check Everything is Working
+
+```bash
+# Diagnose issues
+bbai doctor
+
+# Try to fix issues automatically
+bbai doctor --fix
+```
+
+### AI-Driven Investigation (Advanced)
 
 ```bash
 # Basic investigation
@@ -204,9 +230,6 @@ bbai agent investigate example.com
 
 # With more iterations (deeper investigation)
 bbai agent investigate example.com --max-iterations 50
-
-# Save report to file
-bbai agent investigate example.com -o report.md
 
 # With custom scope file
 bbai agent investigate api.example.com --scope-file ./scope.yaml
@@ -226,7 +249,7 @@ bbai agent demo
 bbai shell
 
 # Inside shell:
-> scan --target example.com --iterations 30
+> scan example.com
 > /status
 > /help
 > /exit
@@ -504,7 +527,41 @@ block_private_ips: true
 
 ---
 
+## Command Reference
+
+```bash
+# Quick start
+bbai scan <target>           # Simple one-command scan
+bbai doctor                  # Check installation health
+
+# Configuration
+bbai setup                   # First-time setup
+bbai config --list           # View configuration
+
+# Investigation
+bbai agent investigate       # Full AI-driven investigation
+bbai agent demo              # Demo mode (no network)
+
+# Utilities
+bbai shell                   # Interactive shell
+bbai tools status            # Check tool status
+bbai validate-scope          # Validate scope file
+```
+
 ## Troubleshooting
+
+### First: Run the Doctor
+
+```bash
+bbai doctor
+```
+
+This checks:
+- ✓ Configuration exists
+- ✓ API key is set
+- ✓ Tools directory exists
+- ✓ Binary tools present
+- ✓ Internet connectivity
 
 ### "Failed to download binary"
 
@@ -514,6 +571,9 @@ ping github.com
 
 # Check if binary already exists
 ls ~/.bbai/tools/
+
+# Check doctor output
+bbai doctor
 
 # Manually install if needed
 winget install ProjectDiscovery.Subfinder  # Windows
