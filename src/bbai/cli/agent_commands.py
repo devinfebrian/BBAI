@@ -6,7 +6,11 @@ import asyncio
 from pathlib import Path
 from typing import Annotated
 
+import nest_asyncio
 import typer
+
+# Allow nested event loops (needed for running from interactive shells)
+nest_asyncio.apply()
 from rich.console import Console
 from rich.panel import Panel
 
