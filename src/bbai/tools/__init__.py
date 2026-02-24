@@ -1,71 +1,23 @@
-"""Tool abstraction and Docker integration.
+"""Tool wrappers for security scanning tools."""
 
-This package provides Docker-based tool execution and output parsing
-for security scanning tools.
-"""
-
-from bbai.tools.docker_client import (
-    ContainerConfig,
-    DockerImageManager,
-    DockerToolRunner,
+from bbai.tools.wrappers.base import (
+    BinaryToolWrapper,
+    PythonToolWrapper,
     ToolResult,
+    ToolWrapper,
 )
-from bbai.tools.interfaces import (
-    BaseTool,
-    ReconTool,
-    SecretScannerTool,
-    ToolCategory,
-    ToolMetadata,
-    ToolPriority,
-    VulnScannerTool,
-)
-from bbai.tools.parsers import (
-    AmassParser,
-    BaseParser,
-    NucleiParser,
-    ParsedEndpoint,
-    ParsedFinding,
-    ParsedSecret,
-    ParsedSubdomain,
-    SubfinderParser,
-    TruffleHogParser,
-    get_parser,
-)
-from bbai.tools.registry import (
-    ToolRegistry,
-    get_registry,
-    get_tool,
-    register_tool,
-)
+from bbai.tools.wrappers.httpx import HttpxWrapper
+from bbai.tools.wrappers.katana import KatanaWrapper
+from bbai.tools.wrappers.nuclei import NucleiWrapper
+from bbai.tools.wrappers.subfinder import SubfinderWrapper
 
 __all__ = [
-    # Docker client
-    "ContainerConfig",
-    "DockerToolRunner",
-    "DockerImageManager",
+    "ToolWrapper",
+    "BinaryToolWrapper",
+    "PythonToolWrapper",
     "ToolResult",
-    # Interfaces
-    "BaseTool",
-    "ReconTool",
-    "VulnScannerTool",
-    "SecretScannerTool",
-    "ToolCategory",
-    "ToolMetadata",
-    "ToolPriority",
-    # Registry
-    "ToolRegistry",
-    "get_registry",
-    "get_tool",
-    "register_tool",
-    # Parsers
-    "BaseParser",
-    "ParsedFinding",
-    "ParsedSubdomain",
-    "ParsedEndpoint",
-    "ParsedSecret",
-    "NucleiParser",
-    "SubfinderParser",
-    "AmassParser",
-    "TruffleHogParser",
-    "get_parser",
+    "SubfinderWrapper",
+    "HttpxWrapper",
+    "KatanaWrapper",
+    "NucleiWrapper",
 ]

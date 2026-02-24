@@ -1,13 +1,34 @@
 """LLM integration and AI reasoning modules for BBAI.
 
-Provides Kimi K2.5 integration for vulnerability analysis,
+Provides multi-provider LLM integration for vulnerability analysis,
 strategy selection, and report generation.
+
+Supported providers:
+- Moonshot AI (Kimi K2.5)
+- OpenAI (GPT-4, GPT-3.5)
+- Anthropic (Claude)
+- Ollama (local models)
+- OpenAI-compatible APIs
 """
 
-from bbai.llm.client import (
+# New multi-provider imports
+from bbai.llm.factory import (
+    LLMProvider,
+    create_llm_client,
+    get_available_providers,
+)
+from bbai.llm.providers import (
     AnalysisResult,
-    KimiClient,
+    BaseLLMClient,
     LLMResponse,
+    MockLLMClient,
+)
+
+# Keep backward compatibility with old imports
+from bbai.llm.client import (
+    AnalysisResult as LegacyAnalysisResult,
+    KimiClient,
+    LLMResponse as LegacyLLMResponse,
     MockKimiClient,
 )
 from bbai.llm.prompts import (
@@ -39,11 +60,18 @@ from bbai.llm.thought_stream import (
 )
 
 __all__ = [
-    # Client
-    "KimiClient",
-    "MockKimiClient",
+    # Factory (new multi-provider)
+    "LLMProvider",
+    "create_llm_client",
+    "get_available_providers",
+    # Providers
+    "BaseLLMClient",
+    "MockLLMClient",
     "LLMResponse",
     "AnalysisResult",
+    # Legacy clients (backward compatibility)
+    "KimiClient",
+    "MockKimiClient",
     # Thought streaming
     "AIThoughtStreamer",
     "ThoughtLogger",

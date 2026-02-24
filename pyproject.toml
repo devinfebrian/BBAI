@@ -3,7 +3,7 @@ name = "bbai"
 version = "0.1.0"
 description = "Bug Bounty AI Agent - Production-grade automation framework with visible AI reasoning"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 license = {text = "MIT"}
 authors = [
     {name = "BBAI Team"}

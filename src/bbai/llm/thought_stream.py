@@ -38,9 +38,9 @@ class ThoughtTheme:
     INFO = Style(color="white")
 
     ICONS = {
-        ThoughtType.ANALYZING: "🤔",
-        ThoughtType.DECIDING: "🎯",
-        ThoughtType.WARNING: "⚠️",
+        ThoughtType.ANALYZING: "[ANALYZING]",
+        ThoughtType.DECIDING: "[DECIDING]",
+        ThoughtType.WARNING: "[WARNING]",
         ThoughtType.ERROR: "❌",
         ThoughtType.SUCCESS: "✅",
         ThoughtType.INFO: "ℹ️",
@@ -213,7 +213,7 @@ class AIThoughtStreamer:
     def complete_thought(self, message: str | None = None) -> None:
         """Complete the current thought with optional summary."""
         if self._current_thought and message:
-            self._current_thought.details.append(f"[bold green]✓ {message}[/]")
+            self._current_thought.details.append(f"[bold green]OK: {message}[/]")
             self._refresh()
 
     def _refresh(self) -> None:
@@ -246,7 +246,7 @@ class AIThoughtStreamer:
         
         return Panel(
             content,
-            title="[bold blue]🧠 AI Reasoning Stream[/]",
+            title="[bold blue]AI Reasoning Stream[/]",
             border_style="blue",
             subtitle=footer,
         )

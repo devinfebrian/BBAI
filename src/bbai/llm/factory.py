@@ -1,0 +1,168 @@
+"""LLM Client Factory - creates the appropriate client based on configuration."""
+
+from __future__ import annotations
+
+from enum import Enum
+from typing import TYPE_CHECKING
+
+from bbai.llm.providers import (
+    AnthropicClient,
+    BaseLLMClient,
+    MockLLMClient,
+    MoonshotClient,
+    OllamaClient,
+    OpenAIClient,
+    OpenAICompatibleClient,
+)
+
+if TYPE_CHECKING:
+    from bbai.core.config_models import LLMProviderConfig
+
+
+class LLMProvider(str, Enum):
+    """Supported LLM providers."""
+
+    MOONSHOT = "moonshot"
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    OLLAMA = "ollama"
+    OPENAI_COMPATIBLE = "openai_compatible"
+    MOCK = "mock"
+
+    @classmethod
+    def get_display_name(cls, provider: str) -> str:
+        """Get human-readable display name for provider."""
+        names = {
+            cls.MOONSHOT: "Moonshot AI (Kimi K2.5)",
+            cls.OPENAI: "OpenAI (GPT-4/GPT-3.5)",
+            cls.ANTHROPIC: "Anthropic (Claude)",
+            cls.OLLAMA: "Ollama (Local Models)",
+            cls.OPENAI_COMPATIBLE: "OpenAI-Compatible API",
+            cls.MOCK: "Mock (for testing)",
+        }
+        return names.get(provider, provider)
+
+    @classmethod
+    def get_default_models(cls, provider: str) -> list[str]:
+        """Get default models for a provider."""
+        models = {
+            cls.MOONSHOT: ["kimi-k2-5", "kimi-k1-5", "kimi-k1"],
+            cls.OPENAI: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o3-mini"],
+            cls.ANTHROPIC: ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5", "claude-3-5-sonnet-20241022"],
+            cls.OLLAMA: ["llama3.2", "llama3.1", "mistral", "codellama", "qwen2.5"],
+            cls.OPENAI_COMPATIBLE: ["custom-model"],
+            cls.MOCK: ["mock-model"],
+        }
+        return models.get(provider, [])
+
+    @classmethod
+    def get_api_key_env(cls, provider: str) -> str:
+        """Get environment variable name for API key."""
+        env_vars = {
+            cls.MOONSHOT: "MOONSHOT_API_KEY",
+            cls.OPENAI: "OPENAI_API_KEY",
+            cls.ANTHROPIC: "ANTHROPIC_API_KEY",
+            cls.OLLAMA: "",
+            cls.OPENAI_COMPATIBLE: "OPENAI_API_KEY",
+            cls.MOCK: "",
+        }
+        return env_vars.get(provider, "")
+
+    @classmethod
+    def requires_api_key(cls, provider: str) -> bool:
+        """Check if provider requires an API key."""
+        return cls.get_api_key_env(provider) != ""
+
+    @classmethod
+    def get_description(cls, provider: str) -> str:
+        """Get description for provider."""
+        descriptions = {
+            cls.MOONSHOT: "Kimi K2.5 - Excellent for security analysis with long context",
+            cls.OPENAI: "GPT-4 series - Reliable and widely used",
+            cls.ANTHROPIC: "Claude 3.5 Sonnet - Strong reasoning capabilities",
+            cls.OLLAMA: "Run models locally - Free and private (requires Ollama installed)",
+            cls.OPENAI_COMPATIBLE: "Custom OpenAI-compatible endpoint (LocalAI, vLLM, etc.)",
+            cls.MOCK: "Mock responses for testing without API costs",
+        }
+        return descriptions.get(provider, "")
+
+
+# Mapping of provider enum to client class
+PROVIDER_CLIENT_MAP: dict[LLMProvider, type[BaseLLMClient]] = {
+    LLMProvider.MOONSHOT: MoonshotClient,
+    LLMProvider.OPENAI: OpenAIClient,
+    LLMProvider.ANTHROPIC: AnthropicClient,
+    LLMProvider.OLLAMA: OllamaClient,
+    LLMProvider.OPENAI_COMPATIBLE: OpenAICompatibleClient,
+    LLMProvider.MOCK: MockLLMClient,
+}
+
+
+def create_llm_client(config: LLMProviderConfig | None = None, **kwargs) -> BaseLLMClient:
+    """Create an LLM client from configuration.
+    
+    Args:
+        config: LLM provider configuration
+        **kwargs: Additional arguments to pass to client constructor
+        
+    Returns:
+        Configured LLM client instance
+        
+    Raises:
+        ValueError: If provider is not supported or config is invalid
+        
+    Examples:
+        # From config
+        client = create_llm_client(config)
+        
+        # Direct creation
+        client = create_llm_client(
+            provider="openai",
+            api_key="sk-...",
+            model="gpt-4"
+        )
+    """
+    if config is not None:
+        provider = LLMProvider(config.provider)
+        client_class = PROVIDER_CLIENT_MAP.get(provider)
+        
+        if not client_class:
+            raise ValueError(f"Unsupported provider: {config.provider}")
+        
+        return client_class(
+            api_key=config.api_key,
+            base_url=config.base_url,
+            model=config.model,
+            temperature=config.temperature,
+            max_tokens=config.max_tokens,
+            timeout=config.timeout,
+            **kwargs,
+        )
+    else:
+        # Create from kwargs
+        provider_str = kwargs.pop("provider", "mock")
+        provider = LLMProvider(provider_str)
+        client_class = PROVIDER_CLIENT_MAP.get(provider)
+        
+        if not client_class:
+            raise ValueError(f"Unsupported provider: {provider_str}")
+        
+        return client_class(**kwargs)
+
+
+def get_available_providers() -> list[dict[str, str]]:
+    """Get list of available providers with metadata.
+    
+    Returns:
+        List of provider metadata dictionaries
+    """
+    providers = []
+    for provider in LLMProvider:
+        providers.append({
+            "id": provider.value,
+            "name": LLMProvider.get_display_name(provider.value),
+            "description": LLMProvider.get_description(provider.value),
+            "requires_api_key": LLMProvider.requires_api_key(provider.value),
+            "api_key_env": LLMProvider.get_api_key_env(provider.value),
+        })
+    return providers

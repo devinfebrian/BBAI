@@ -7,6 +7,8 @@ modules for BBAI.
 from bbai.core.config_models import (
     AgentState,
     BBAIConfig,
+    LLMProvider,
+    LLMProviderConfig,
     ProgramConfig,
     RateLimitConfig,
     SafetyEvent,
@@ -36,6 +38,8 @@ __all__ = [
     # Config models
     "AgentState",
     "BBAIConfig",
+    "LLMProvider",
+    "LLMProviderConfig",
     "ProgramConfig",
     "RateLimitConfig",
     "SafetyEvent",

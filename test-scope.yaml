@@ -1,0 +1,22 @@
+name: Test Program
+platform: hackerone
+description: Bug bounty scope for Test Program
+scope_in:
+- pattern: '*.example.com'
+  description: All subdomains
+- pattern: example.com
+  description: Main domain
+scope_out:
+- pattern: '*.internal.example.com'
+  description: Internal systems
+- pattern: '*.corp.example.com'
+  description: Corporate network
+timing:
+  timezone: UTC
+  max_requests_per_second: 5.0
+rate_limit:
+  requests_per_second: 5.0
+  burst_size: 10
+  concurrent_tools: 3
+auto_halt_on_critical: true
+block_private_ips: true

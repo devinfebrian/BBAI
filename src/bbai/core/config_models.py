@@ -8,6 +8,8 @@ This module defines all configuration schemas using Pydantic v2 best practices:
 
 from __future__ import annotations
 
+import json
+import os
 import re
 from datetime import datetime
 from enum import Enum
@@ -349,15 +351,78 @@ class AgentState(BaseModel):
             self.halt_requested = True
 
 
-class BBAIConfig(BaseModel):
-    """Global BBAI application configuration.
+class LLMProvider(str, Enum):
+    """Supported LLM providers."""
+
+    MOONSHOT = "moonshot"
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
+    OLLAMA = "ollama"
+    OPENAI_COMPATIBLE = "openai_compatible"
+    MOCK = "mock"
+
+
+class LLMProviderConfig(BaseModel):
+    """Configuration for an LLM provider.
     
-    Loaded from environment variables and config files.
+    This is stored as part of BBAIConfig for easy access.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    # LLM Settings
+    provider: str = Field(
+        default="moonshot",
+        description="LLM provider identifier",
+    )
+    model: str = Field(
+        default="kimi-k2-5",
+        description="Model name to use",
+    )
+    api_key: str | None = Field(
+        default=None,
+        description="API key for the provider",
+    )
+    base_url: str | None = Field(
+        default=None,
+        description="Custom base URL for API",
+    )
+    temperature: float = Field(
+        default=0.1,
+        ge=0.0,
+        le=2.0,
+        description="Sampling temperature",
+    )
+    max_tokens: int = Field(
+        default=4000,
+        ge=100,
+        le=16000,
+        description="Maximum tokens in response",
+    )
+    timeout: float = Field(
+        default=60.0,
+        ge=5.0,
+        le=300.0,
+        description="Request timeout in seconds",
+    )
+    enabled: bool = Field(
+        default=True,
+        description="Whether this provider is enabled",
+    )
+
+
+class BBAIConfig(BaseModel):
+    """Global BBAI application configuration.
+    
+    Loaded from environment variables and config files.
+    Supports persistent storage to JSON file.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    # LLM Configuration (NEW: Multi-provider support)
+    llm: LLMProviderConfig = Field(default_factory=LLMProviderConfig)
+
+    # Deprecated: Kept for backward compatibility
     moonshot_api_key: str | None = Field(default=None)
     moonshot_model: str = Field(default="kimi-k2-5")
     moonshot_base_url: str | None = Field(default=None)
@@ -391,3 +456,89 @@ class BBAIConfig(BaseModel):
         self.projects_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         return self
+
+    @property
+    def config_file(self) -> Path:
+        """Get path to the config file."""
+        return self.data_dir / "config.json"
+
+    def save(self) -> None:
+        """Save configuration to disk.
+        
+        The config is stored as JSON in ~/.bbai/config.json
+        API keys are stored separately in environment variables
+        or can be optionally saved (with user consent).
+        """
+        # Create config dict, converting Paths to strings
+        config_dict = self.model_dump(mode="json")
+        
+        # Ensure directory exists
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Write config file with restricted permissions
+        config_file = self.config_file
+        with open(config_file, "w") as f:
+            json.dump(config_dict, f, indent=2)
+        
+        # Set restrictive permissions (owner read/write only)
+        os.chmod(config_file, 0o600)
+
+    @classmethod
+    def load(cls) -> BBAIConfig:
+        """Load configuration from disk.
+        
+        Returns:
+            BBAIConfig instance loaded from file, or default config if file doesn't exist
+        """
+        config_file = Path.home() / ".bbai" / "config.json"
+        
+        if not config_file.exists():
+            return cls()
+        
+        try:
+            with open(config_file) as f:
+                data = json.load(f)
+            return cls(**data)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            # If config is corrupted, return default
+            return cls()
+
+    @classmethod
+    def load_with_env(cls) -> BBAIConfig:
+        """Load configuration from disk and apply environment overrides.
+        
+        Environment variables take precedence over saved config.
+        
+        Returns:
+            BBAIConfig instance with environment overrides applied
+        """
+        config = cls.load()
+        
+        # Check for environment variable overrides
+        env_mappings = {
+            "BBAI_LLM_PROVIDER": ("llm", "provider"),
+            "BBAI_LLM_MODEL": ("llm", "model"),
+            "BBAI_LLM_API_KEY": ("llm", "api_key"),
+            "BBAI_LLM_BASE_URL": ("llm", "base_url"),
+            "BBAI_THEME": ("theme",),
+        }
+        
+        updates = {}
+        for env_var, path in env_mappings.items():
+            value = os.environ.get(env_var)
+            if value:
+                if len(path) == 1:
+                    updates[path[0]] = value
+                elif len(path) == 2:
+                    nested = updates.get(path[0], {})
+                    if isinstance(nested, dict):
+                        nested[path[1]] = value
+                    else:
+                        nested = config.model_dump().get(path[0], {})
+                        nested[path[1]] = value
+                    updates[path[0]] = nested
+        
+        if updates:
+            config = config.model_copy(update=updates)
+        
+        return config

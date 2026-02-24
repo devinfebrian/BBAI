@@ -1,132 +1,623 @@
 # BBAI - Bug Bounty AI Agent
 
-A production-grade, interactive bug bounty automation framework featuring a **Kimi Code CLI-style interface** with **visible AI reasoning streams**.
+An AI-driven security testing framework that makes intelligent decisions about what to investigate and which security tools to run.
 
-## Features
+> **Status**: Functional for small targets (< 100 subdomains). Core architecture complete, needs hardening for production use.
 
-- **Interactive Shell**: Rich UI with auto-completion and command history
-- **AI Thought Streamer**: Real-time visualization of AI reasoning process
-- **Immutable Scope Engine**: Legal protection through strict scope validation
-- **LangGraph Orchestration**: State machine workflow for complex security tasks
-- **Containerized Tools**: 8 Docker images with 25+ security tools
-- **Kimi K2.5 Integration**: AI-powered analysis and false positive filtering
+---
 
-## Quick Start
+## Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [How It Works](#how-it-works)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Tools Assessment](#tools-assessment)
+- [Safety & Scope](#safety--scope)
+- [Future Improvements](#future-improvements)
+- [Troubleshooting](#troubleshooting)
+
+---
+
+## Overview
+
+BBAI is an AI-driven security testing agent that follows a **ReAct pattern** (Reasoning + Acting):
+
+1. **THINK**: AI analyzes current findings and decides next action
+2. **ACT**: Executes the chosen security tool
+3. **OBSERVE**: Processes results and updates knowledge
+4. **REPEAT**: Continues until investigation is complete
+
+### Key Features
+
+- 🤖 **AI-Driven**: LLM makes intelligent decisions about what to investigate
+- 🔧 **Auto-Downloading Tools**: Security binaries downloaded on first use
+- 🛡️ **Safety First**: Scope validation before every network call
+- 📊 **Adaptive Strategy**: Changes approach based on findings (e.g., GraphQL detected → run GraphQL tests)
+- 📝 **Structured Reports**: Markdown reports with findings summary
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ USER INTERFACE (CLI)                                                             │
+│  bbai agent investigate example.com --max-iterations 30                         │
+└─────────────────────────────────────────────────┬───────────────────────────────┘
+                                                  │
+                                                  ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ SAFETY LAYER                                                                     │
+│  • Validate target against scope rules                                           │
+│  • Block private IPs (10.x.x.x, 192.168.x.x)                                    │
+│  • Check rate limits                                                             │
+└─────────────────────────────────────────────────┬───────────────────────────────┘
+                                                  │ ALLOWED
+                                                  ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ AI AGENT LOOP                                                                    │
+│                                                                                  │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐      │
+│  │   THINK     │───→│    ACT      │───→│  OBSERVE    │───→│   REPEAT    │      │
+│  │             │    │             │    │             │    │   (or END)  │      │
+│  │ LLM decides │    │ Run tool    │    │ Parse &     │    │             │      │
+│  │ next action │    │ via registry│    │ update state│    │             │      │
+│  └─────────────┘    └──────┬──────┘    └─────────────┘    └─────────────┘      │
+│         ▲                  │                                       │            │
+│         └──────────────────┴───────────────────────────────────────┘            │
+│                            (Loop up to 30 iterations)                           │
+│                                                                                  │
+│  STATE TRACKED:                                                                  │
+│  • hosts discovered (with tech stack)                                            │
+│  • endpoints found (APIs, forms, etc.)                                          │
+│  • vulnerabilities identified                                                    │
+│  • previous actions & observations                                               │
+│                                                                                  │
+└─────────────────────────────────────────────────┬───────────────────────────────┘
+                                                  │ ToolDecision
+                                                  │ {tool_name, params}
+                                                  ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ TOOL REGISTRY                                                                    │
+│  • Validates AI input against Pydantic schemas                                   │
+│  • Translates AI intent → CLI commands                                           │
+│  • Routes to appropriate tool wrapper                                            │
+└─────────────────────────────────────────────────┬───────────────────────────────┘
+                                                  │
+                                                  ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│ BINARY WRAPPERS                                                                  │
+│                                                                                  │
+│  subfinder  →  Download from GitHub  →  Run: subfinder -d target -json          │
+│  httpx      →  Download from GitHub  →  Run: httpx -u target -tech-detect       │
+│  katana     →  Download from GitHub  →  Run: katana -u target -json             │
+│  nuclei     →  Download from GitHub  →  Run: nuclei -u target -t templates      │
+│                                                                                  │
+│  Binary Location: ~/.bbai/tools/                                                 │
+│  Auto-downloaded on first use (~200 MB total)                                    │
+│                                                                                  │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Three-Layer Architecture
+
+| Layer | Purpose | Key Files |
+|-------|---------|-----------|
+| **AI Agent** | Decision making, state management | `src/bbai/agent/agent.py` |
+| **Tool Registry** | Input validation, routing | `src/bbai/agent/tools.py` |
+| **Binary Wrappers** | CLI execution, output parsing | `src/bbai/tools/wrappers/*.py` |
+
+---
+
+## How It Works
+
+### Example Investigation Flow
+
+```
+User: bbai agent investigate example.com
+
+[Iteration 1] Strategy: initial_recon
+AI Reasoning: "Starting fresh. Need to understand attack surface."
+Action: Run subfinder(domain="example.com")
+Result: Found 15 subdomains
+
+[Iteration 2] Strategy: initial_recon  
+AI Reasoning: "Good baseline. Now check which hosts are alive."
+Action: Run httpx(targets=["sub1.example.com", "sub2.example.com", ...])
+Result: api.example.com: 200, Express.js, [GraphQL] ← AI notices this!
+
+[Iteration 3] Strategy: deep_dive ← Changed!
+AI Reasoning: "GraphQL detected! Should run GraphQL-specific tests."
+Action: Run nuclei(targets=["api.example.com"], templates=["graphql"])
+Result: Found GraphQL Introspection Enabled (HIGH)
+
+[Iteration 4] Strategy: deep_dive
+AI Reasoning: "Found a confirmed vulnerability. Check admin panel too."
+Action: Run katana(url="admin.example.com", depth=2)
+Result: Crawled 23 endpoints, found /login, /api/internal
+
+[Iteration 5] Strategy: report
+AI Reasoning: "Good coverage achieved. Ready to report findings."
+Action: Report findings
+
+Final Report Generated:
+- 15 hosts discovered
+- 47 endpoints mapped  
+- 1 HIGH severity finding: GraphQL Introspection
+```
+
+---
+
+## Installation
+
+### Prerequisites
+
+- Python 3.13+
+- [UV](https://docs.astral.sh/uv/) package manager
+- Git (for cloning)
+- Internet connection (for downloading tools)
+
+### Setup
 
 ```bash
+# Clone the repository
+git clone <repository-url>
+cd bbai
+
 # Install dependencies
 uv pip install -e .
 
+# Run first-time setup (configures LLM)
+bbai setup
+
+# Or start directly (will prompt setup)
+bbai
+```
+
+### LLM Configuration
+
+BBAI supports multiple LLM providers:
+
+| Provider | Environment Variable | Model |
+|----------|---------------------|-------|
+| Moonshot AI | `MOONSHOT_API_KEY` | kimi-k2-5 |
+| OpenAI | `OPENAI_API_KEY` | gpt-4o |
+| Anthropic | `ANTHROPIC_API_KEY` | claude-3-5-sonnet |
+| Ollama | None (local) | llama3.2, mistral |
+
+Set your API key:
+```bash
+export MOONSHOT_API_KEY="sk-your-key-here"
+```
+
+---
+
+## Usage
+
+### AI-Driven Investigation
+
+```bash
+# Basic investigation
+bbai agent investigate example.com
+
+# With more iterations (deeper investigation)
+bbai agent investigate example.com --max-iterations 50
+
+# Save report to file
+bbai agent investigate example.com -o report.md
+
+# With custom scope file
+bbai agent investigate api.example.com --scope-file ./scope.yaml
+```
+
+### Demo Mode (No Network)
+
+```bash
+# See how the AI makes decisions without running tools
+bbai agent demo
+```
+
+### Interactive Shell
+
+```bash
 # Start interactive shell
 bbai shell
 
-# Or use commands directly
-bbai init my-project --target example.com
-bbai scan --target example.com --program myprogram
-bbai config --list
+# Inside shell:
+> scan --target example.com --iterations 30
+> /status
+> /help
+> /exit
 ```
+
+### Scope Management
+
+```bash
+# Create scope template
+bbai create-scope-template ./program.yaml --name "HackerOne" --target hackerone.com
+
+# Validate scope file
+bbai validate-scope ./program.yaml
+
+# Edit the YAML to customize:
+# - scope_in: What's in scope
+# - scope_out: What's out of scope  
+# - rate_limit: Request throttling
+```
+
+### Tool Management
+
+```bash
+# List available tools
+bbai tools list
+
+# Check tool status
+bbai tools status
+
+# Update tool binaries
+bbai tools update
+```
+
+### Configuration
+
+```bash
+# View config
+bbai config --list
+
+# Reconfigure LLM
+bbai setup --force
+```
+
+---
+
+## Tools Assessment
+
+### Currently Available
+
+| Tool | Status | Purpose | Download Size |
+|------|--------|---------|---------------|
+| **subfinder** | ✅ Working | Subdomain enumeration (passive) | 31 MB |
+| **httpx** | ✅ Working | HTTP probing, tech detection | 39 MB |
+| **katana** | ✅ Working | Web crawler (JS rendering) | 36 MB |
+| **nuclei** | ✅ Working | Vulnerability scanning | 93 MB |
+
+**Total Download**: ~200 MB (first use)
+
+### Tool Details
+
+#### subfinder
+```python
+# AI calls this as:
+{
+  "tool_name": "subfinder",
+  "params": {
+    "domain": "example.com",
+    "sources": ["all"]  # or ["crtsh", "virustotal"]
+  }
+}
+```
+- **Passive**: No traffic to target
+- **Sources**: 50+ passive sources (crt.sh, VirusTotal, etc.)
+- **Output**: List of subdomains
+
+#### httpx
+```python
+# AI calls this as:
+{
+  "tool_name": "httpx",
+  "params": {
+    "targets": ["sub1.example.com", "sub2.example.com"],
+    "tech_detection": true
+  }
+}
+```
+- **Active**: Sends HTTP requests to target
+- **Detects**: Tech stack (Wappalyzer), status codes, titles
+- **Output**: Live hosts with technology fingerprinting
+
+#### katana
+```python
+# AI calls this as:
+{
+  "tool_name": "katana",
+  "params": {
+    "url": "https://example.com",
+    "depth": 3,
+    "js_rendering": true
+  }
+}
+```
+- **Active**: Crawls target website
+- **Features**: Headless browser, JS execution, form discovery
+- **Output**: Discovered endpoints, API paths, forms
+
+#### nuclei
+```python
+# AI calls this as:
+{
+  "tool_name": "nuclei",
+  "params": {
+    "targets": ["api.example.com"],
+    "severity": ["critical", "high"],
+    "templates": ["graphql", "cve"]  # AI chooses based on findings!
+  }
+}
+```
+- **Active**: Sends test payloads to target
+- **Templates**: 4000+ vulnerability templates
+- **Smart**: AI selects specific templates (e.g., `graphql` when GraphQL detected)
+
+### Planned Tools (Not Yet Implemented)
+
+| Tool | Purpose | Priority |
+|------|---------|----------|
+| naabu | Port scanning | Medium |
+| trufflehog | Secret scanning | Medium |
+| feroxbuster | Content fuzzing | Low |
+| gowitness | Screenshots | Low |
+| amass | Comprehensive recon | Low |
+
+---
+
+## Safety & Scope
+
+### Safety Features
+
+1. **Scope Validation** (Every request)
+   - Checks against `scope_in` patterns
+   - Blocks `scope_out` patterns
+   - Validates before ANY network call
+
+2. **Private IP Blocking**
+   - Blocks 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+   - Prevents accidental internal scanning
+
+3. **Rate Limiting**
+   - Configurable requests per second
+   - Default: 5 req/s
+
+4. **Tool Timeouts**
+   - Each tool has 5-minute timeout
+   - Prevents hanging investigations
+
+### Scope File Example
+
+```yaml
+name: my-program
+platform: hackerone
+scope_in:
+  - pattern: "*.example.com"
+    description: "All subdomains"
+  - pattern: "example.com"
+    description: "Main domain"
+scope_out:
+  - pattern: "*.internal.example.com"
+    description: "Internal systems"
+  - pattern: "*.corp.example.com"
+    description: "Corporate network"
+timing:
+  timezone: "UTC"
+  max_requests_per_second: 5.0
+rate_limit:
+  requests_per_second: 5.0
+  burst_size: 10
+auto_halt_on_critical: true
+block_private_ips: true
+```
+
+---
+
+## Current Limitations
+
+### What's Working
+- ✅ Core AI agent loop
+- ✅ 4 security tools with auto-download
+- ✅ Scope validation and safety checks
+- ✅ Basic error handling with timeouts
+- ✅ 112 unit tests passing
+
+### What Needs Improvement
+
+| Issue | Impact | Workaround |
+|-------|--------|------------|
+| **No state persistence** | Lose progress on crash | Restart investigation |
+| **Sequential execution** | Slower on large targets | Use smaller scope |
+| **Basic LLM error handling** | May fail on malformed responses | Retry command |
+| **No parallel tool execution** | Tools run one at a time | None (future feature) |
+| **Context window limits** | Large targets may overflow | Limit iterations |
+
+### Production Readiness
+
+**Status**: Functional for small targets, needs hardening for production.
+
+**Ready for**:
+- Development and testing
+- Small targets (< 100 subdomains)
+- Demonstrations
+- Learning workflows
+
+**Not ready for**:
+- Large enterprise targets
+- Unattended operation
+- Critical infrastructure testing
+
+---
+
+## Future Improvements
+
+### Short Term (Next 2-4 weeks)
+
+1. **State Persistence**
+   - SQLite storage for investigation state
+   - Resume interrupted investigations
+   - Audit log of AI decisions
+
+2. **Better Error Handling**
+   - LLM response retry with backoff
+   - Graceful degradation on tool failures
+   - Better error messages to user
+
+3. **Parallel Execution**
+   - Run independent tools concurrently
+   - Example: httpx + subfinder at same time
+
+4. **More Tools**
+   - naabu (port scanning)
+   - trufflehog (secrets)
+
+### Medium Term (1-3 months)
+
+1. **Human-in-the-Loop**
+   - Pause for approval on critical findings
+   - Interactive decision override
+
+2. **Multi-Target Support**
+   - Investigate multiple related targets
+   - Cross-reference findings
+
+3. **Advanced Strategies**
+   - Multi-step planning ("first X, then Y, then Z")
+   - Tool result correlation
+   - Confidence scoring
+
+4. **Web UI**
+   - Browser-based interface
+   - Real-time progress visualization
+   - Historical investigation browser
+
+### Long Term (3-6 months)
+
+1. **Custom Tool Integration**
+   - Plugin system for custom tools
+   - Community tool repository
+
+2. **Learning System**
+   - Remember effective strategies per target type
+   - Adapt based on past investigations
+
+3. **Team Collaboration**
+   - Share investigations
+   - Comment on findings
+   - Assign tasks
+
+---
+
+## Troubleshooting
+
+### "Failed to download binary"
+
+```bash
+# Check internet connectivity to github.com
+ping github.com
+
+# Check if binary already exists
+ls ~/.bbai/tools/
+
+# Manually install if needed
+winget install ProjectDiscovery.Subfinder  # Windows
+brew install subfinder                      # macOS
+```
+
+### "LLM error" or API failures
+
+```bash
+# Check API key is set
+echo $MOONSHOT_API_KEY  # or $OPENAI_API_KEY
+
+# Test connectivity
+bbai config --list
+
+# Check LLM provider status
+bbai config --get llm.provider
+
+# Reconfigure if needed
+bbai setup --force
+```
+
+### "Target validation failed"
+
+```bash
+# Check scope file format
+bbai validate-scope ./scope.yaml
+
+# Common issues:
+# - Pattern syntax (use * for wildcards)
+# - YAML indentation
+# - Missing required fields
+```
+
+### Tool timeouts
+
+Tools have a 5-minute timeout. If a tool times out:
+- Target may be too large
+- Network connectivity issues
+- Try reducing scope or iterations
+
+### Tests failing
+
+```bash
+# Run tests
+uv run pytest tests/unit -v
+
+# Common issues:
+# - Missing dependencies: uv pip install -e ".[dev]"
+# - Python version: requires 3.13+
+```
+
+---
 
 ## Project Structure
 
 ```
 bbai/
 ├── src/bbai/
-│   ├── cli/              # CLI and interactive shell
-│   ├── core/             # Configuration, safety, scope engine
-│   ├── llm/              # AI thought streamer and Kimi K2.5 client
-│   ├── orchestration/    # LangGraph workflow nodes and state
-│   ├── tools/            # Docker tool abstraction and parsers
-│   └── reporting/        # Report generators
-├── docker/               # 8 containerized tool images
-└── tests/                # Unit and integration tests (154 tests)
+│   ├── agent/                    # AI agent (core)
+│   │   ├── agent.py              # Main agent loop
+│   │   ├── tools.py              # Agent tool wrappers
+│   │   └── __init__.py
+│   ├── cli/                      # Command-line interface
+│   │   ├── main.py               # Entry point
+│   │   ├── agent_commands.py     # Agent CLI commands
+│   │   ├── shell.py              # Interactive shell
+│   │   ├── setup_wizard.py       # First-time setup
+│   │   └── tools_commands.py     # Tool management
+│   ├── core/                     # Core functionality
+│   │   ├── config_models.py      # Configuration schemas
+│   │   ├── safety_manager.py     # Scope validation
+│   │   ├── scope_engine.py       # Scope matching
+│   │   └── state_manager.py      # State persistence
+│   ├── llm/                      # LLM clients
+│   │   ├── factory.py            # Client factory
+│   │   ├── providers.py          # Provider implementations
+│   │   └── ...
+│   └── tools/wrappers/           # Binary tool wrappers
+│       ├── base.py               # Base wrapper class
+│       ├── subfinder.py
+│       ├── httpx.py
+│       ├── katana.py
+│       └── nuclei.py
+├── tests/unit/                   # Unit tests (112 tests)
+├── pyproject.toml                # Project config
+└── README.md                     # This file
 ```
 
-## Development Phases
-
-- [x] **Phase 1**: Foundation & Interactive Shell
-- [x] **Phase 2**: Safety & Scope Engine  
-- [x] **Phase 3**: Docker Tool Ecosystem
-- [x] **Phase 4**: LangGraph Orchestration
-- [x] **Phase 5**: Kimi K2.5 Integration
-- [x] **Phase 6**: Reporting & Distribution
-
-## Test Results
-
-```
-============================= 154 passed =============================
-- test_config_models.py: 19 passed
-- test_docker_client.py: 9 passed
-- test_llm.py: 15 passed
-- test_orchestration.py: 18 passed
-- test_parsers.py: 15 passed
-- test_rate_limiter.py: 14 passed
-- test_safety_guards.py: 24 passed
-- test_scope_engine.py: 26 passed
-- test_state_manager.py: 14 passed
-```
-
-## Architecture
-
-### Three-Layer Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Layer 3: AI Orchestration (Python 3.14.3 + UV)             │
-│ ├─ Interactive Shell (Rich + Prompt Toolkit)               │
-│ ├─ Thought Streamer (Real-time AI reasoning display)       │
-│ ├─ LangGraph State Machines                                │
-│ ├─ Safety Guard Nodes (Immutable scope enforcement)        │
-│ └─ Kimi K2.5 Analysis Engine                               │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│ Layer 2: Tool Abstraction API (Async FastAPI)              │
-│ ├─ Docker SDK Integration                                  │
-│ ├─ Output Parsers (JSON/Structured)                        │
-│ ├─ Adaptive Rate Limiting (Token Bucket)                   │
-│ └─ Scope Validation Proxy (Intercept all traffic)          │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│ Layer 1: Containerized Tool Ecosystem (8 Images)           │
-│ ├─ recon-passive: Amass, Subfinder, Assetfinder, GAU       │
-│ ├─ recon-active: Katana, Naabu, DNSx, RustScan, FFUF       │
-│ ├─ content-discovery: Feroxbuster, GoSpider, Hakrawler     │
-│ ├─ vulnerability-core: Nuclei + Templates                  │
-│ ├─ secrets: TruffleHog, Gitleaks, JSubfinder               │
-│ ├─ js-analysis: LinkFinder, Semgrep, JS-Beautify           │
-│ ├─ cloud: CloudEnum, S3Scanner, ScoutURL                   │
-│ └─ visual: GoWitness, Chromium headless                    │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## Configuration
-
-```yaml
-# bbai.yaml - Program configuration
-name: my-program
-platform: hackerone
-scope_in:
-  - pattern: "*.example.com"
-scope_out:
-  - pattern: "admin.example.com"
-timing:
-  blocked_hours: "09:00-17:00"
-rate_limit:
-  requests_per_second: 5.0
-```
-
-## Environment Variables
-
-```bash
-# Required for AI analysis
-export MOONSHOT_API_KEY="your-api-key"
-
-# Optional
-export MOONSHOT_MODEL="kimi-k2-5"
-export BBAI_DATA_DIR="~/.bbai"
-```
+---
 
 ## License
 
 MIT
+
+---
+
+## Contributing
+
+The architecture is designed for extensibility. To add a new tool:
+
+1. Create binary wrapper in `src/bbai/tools/wrappers/`
+2. Create agent tool wrapper in `src/bbai/agent/tools.py`
+3. Register in `ToolRegistry`
+4. AI automatically sees it (no prompt changes needed)
+
+See `src/bbai/tools/wrappers/base.py` for the wrapper interface.
