@@ -454,10 +454,25 @@ def ensure_configured() -> BBAIConfig:
     if check_first_run():
         console.print(Panel(
             "[bold cyan]Welcome to BBAI![/]\n\n"
-            "Let's get you set up with an AI provider.",
+            "BBAI needs an AI provider to work. Let's set it up.",
             border_style="blue",
         ))
         console.print()
         return run_setup_wizard()
     
     return BBAIConfig.load_with_env()
+
+
+def has_valid_api_key() -> bool:
+    """Check if a valid API key is configured."""
+    try:
+        config = BBAIConfig.load_with_env()
+        if config.llm.api_key:
+            return True
+        # Check environment variables
+        for provider in PROVIDERS:
+            if provider.get('env_var') and os.environ.get(provider['env_var']):
+                return True
+    except:
+        pass
+    return False

@@ -35,6 +35,144 @@ def is_first_run() -> bool:
     return not config_file.exists()
 
 
+def show_welcome_menu() -> str:
+    """Show welcome menu for first-time users."""
+    from rich.panel import Panel
+    from rich.table import Table
+    
+    console.print(Panel.fit(
+        "[bold cyan]Welcome to BBAI![/]\n"
+        "[dim]AI-powered security testing[/]",
+        border_style="cyan"
+    ))
+    
+    console.print("\nBBAI is an AI agent that finds security vulnerabilities by")
+    console.print("intelligently deciding which tools to run.\n")
+    
+    # Create menu table
+    table = Table(show_header=False, box=None)
+    table.add_column("#", style="cyan", justify="right")
+    table.add_column("Option")
+    table.add_column("Description", style="dim")
+    
+    table.add_row("1", "Demo Mode", "See how it works (no setup, no API key)")
+    table.add_row("2", "Quick Test", "Scan a safe test target (scanme.nmap.org)")
+    table.add_row("3", "Setup", "Configure AI provider for full functionality")
+    table.add_row("4", "Exit", "Close BBAI")
+    
+    console.print(table)
+    console.print()
+    
+    # Get choice
+    from rich.prompt import Prompt
+    choice = Prompt.ask(
+        "What would you like to do?",
+        choices=["1", "2", "3", "4", "demo", "test", "setup", "exit"],
+        default="1"
+    )
+    
+    # Normalize choice
+    if choice in ("1", "demo"):
+        return "demo"
+    elif choice in ("2", "test"):
+        return "test"
+    elif choice in ("3", "setup"):
+        return "setup"
+    else:
+        return "exit"
+
+
+def run_demo_mode():
+    """Run a demo showing how BBAI works without making real calls."""
+    from rich.panel import Panel
+    from rich.table import Table
+    import time
+    
+    console.print(Panel.fit(
+        "[bold cyan]BBAI Demo Mode[/]\n"
+        "[dim]Showing how the AI makes decisions (no real scans)[/]",
+        border_style="cyan"
+    ))
+    
+    console.print("\n[bold]How BBAI Works:[/]\n")
+    
+    console.print("BBAI follows a [cyan]Think → Act → Observe[/] loop:\n")
+    
+    # Simulate an investigation
+    steps = [
+        ("THINK", "Starting fresh. Need to understand the attack surface.", "cyan"),
+        ("ACT", "Run subfinder to find subdomains...", "blue"),
+        ("OBSERVE", "Found 15 subdomains including api.example.com", "green"),
+        ("THINK", "Good baseline. Check which hosts are alive.", "cyan"),
+        ("ACT", "Run httpx to probe discovered hosts...", "blue"),
+        ("OBSERVE", "api.example.com is alive with GraphQL endpoint!", "green"),
+        ("THINK", "GraphQL detected! Switching to deep_dive strategy.", "yellow"),
+        ("ACT", "Run nuclei with GraphQL templates...", "blue"),
+        ("OBSERVE", "Found: GraphQL Introspection Enabled (HIGH severity)", "red"),
+        ("THINK", "Confirmed finding. Investigation complete.", "cyan"),
+    ]
+    
+    for action, description, color in steps:
+        tag = f"[{color}][{action}][/{color}]"
+        console.print(f"{tag:12} {description}")
+        time.sleep(0.5)
+    
+    console.print("\n" + "─" * 60)
+    console.print("[bold green]Demo Complete![/]\n")
+    
+    console.print("[bold]Key Benefits:[/]")
+    console.print("  • AI adapts strategy based on what it finds")
+    console.print("  • Automatically chooses relevant security tools")
+    console.print("  • Discovers vulnerabilities without manual tool selection")
+    console.print("  • Provides structured reports with findings\n")
+    
+    # Ask what to do next
+    from rich.prompt import Confirm, Prompt
+    console.print("[bold]What next?[/]")
+    
+    next_action = Prompt.ask(
+        "Choose:",
+        choices=["1", "2", "3", "test", "setup", "exit"],
+        default="2"
+    )
+    
+    if next_action in ("1", "test"):
+        return "test"
+    elif next_action in ("2", "setup"):
+        return "setup"
+    else:
+        return "exit"
+
+
+def run_quick_test():
+    """Run a quick test scan on scanme.nmap.org."""
+    import asyncio
+    from rich.panel import Panel
+    
+    console.print(Panel.fit(
+        "[bold cyan]Quick Test[/]\n"
+        "[dim]Scanning scanme.nmap.org (a safe test target)[/]",
+        border_style="cyan"
+    ))
+    
+    console.print("\n[yellow]Note:[/] This requires an AI provider to be configured.")
+    console.print("Would you like to:\n")
+    
+    from rich.prompt import Prompt
+    choice = Prompt.ask(
+        "Choose:",
+        choices=["1", "2", "3", "setup", "demo", "exit"],
+        default="1"
+    )
+    
+    if choice in ("1", "setup"):
+        return "setup"
+    elif choice in ("2", "demo"):
+        return "demo"
+    else:
+        return "exit"
+
+
 @app.callback()
 def main(
     ctx: typer.Context,
@@ -62,7 +200,8 @@ def main(
     An AI-driven security testing framework that makes intelligent decisions
     about what to investigate and which tools to run.
     
-    Run without arguments to start the shell (with first-time setup if needed).
+    Run without arguments to see the welcome menu (first time)
+    or start the shell (subsequent runs).
     """
     # If a subcommand is being invoked, let it handle things
     if ctx.invoked_subcommand is not None:
@@ -70,25 +209,49 @@ def main(
     
     # Check for first run
     if not skip_setup and is_first_run():
-        from rich.panel import Panel
-        console.print(Panel(
-            "[bold cyan]Welcome to BBAI![/]\n\n"
-            "It looks like this is your first time running BBAI.\n"
-            "Let's get you set up with an AI provider.",
-            border_style="blue",
-            padding=(1, 2),
-        ))
-        console.print()
-        
-        # Run setup wizard
-        run_setup_wizard()
-        
-        # After setup, ask if they want to start shell
-        console.print()
-        from rich.prompt import Confirm
-        if Confirm.ask("Start BBAI shell now?", default=True):
-            start_shell()
-        return
+        while True:
+            choice = show_welcome_menu()
+            
+            if choice == "demo":
+                next_action = run_demo_mode()
+                if next_action == "exit":
+                    console.print("\n[dim]Goodbye! Run 'bbai' anytime to get started.[/]")
+                    return
+                elif next_action == "test":
+                    choice = "test"
+                elif next_action == "setup":
+                    choice = "setup"
+            
+            if choice == "test":
+                next_action = run_quick_test()
+                if next_action == "exit":
+                    console.print("\n[dim]Goodbye! Run 'bbai' anytime to get started.[/]")
+                    return
+                elif next_action == "demo":
+                    continue
+                elif next_action == "setup":
+                    choice = "setup"
+            
+            if choice == "setup":
+                console.print()
+                run_setup_wizard()
+                
+                # After setup, ask if they want to try a scan
+                console.print()
+                from rich.prompt import Confirm
+                if Confirm.ask("Try a quick test scan on scanme.nmap.org?", default=True):
+                    console.print("\n[bold cyan]Starting test scan...[/]")
+                    # Run the scan command
+                    import subprocess
+                    subprocess.run(["bbai", "scan", "scanme.nmap.org", "--iterations", "10"])
+                else:
+                    if Confirm.ask("Start BBAI shell?", default=True):
+                        start_shell()
+                return
+            
+            if choice == "exit":
+                console.print("\n[dim]Goodbye! Run 'bbai' anytime to get started.[/]")
+                return
     
     # Not first run - start shell directly
     start_shell()
@@ -292,20 +455,59 @@ def scan(
     import asyncio
     from rich.panel import Panel
     
-    # Ensure configured
-    config = ensure_configured()
+    # Check if configured
+    if is_first_run():
+        console.print(Panel.fit(
+            "[bold cyan]Welcome to BBAI![/]\n"
+            "[dim]AI-powered security testing[/]",
+            border_style="cyan"
+        ))
+        console.print("\nBBAI needs an AI provider to perform scans.")
+        console.print("You have a few options:\n")
+        
+        from rich.table import Table
+        table = Table(show_header=False, box=None)
+        table.add_column("Option", style="cyan")
+        table.add_column("Description")
+        
+        table.add_row("1. Setup", "Configure an AI provider (recommended)")
+        table.add_row("2. Demo", "See how BBAI works without setup")
+        table.add_row("3. Exit", "Close BBAI and come back later")
+        
+        console.print(table)
+        console.print()
+        
+        from rich.prompt import Prompt
+        choice = Prompt.ask("What would you like to do?", choices=["1", "2", "3", "setup", "demo", "exit"], default="1")
+        
+        if choice in ("2", "demo"):
+            run_demo_mode()
+            return
+        elif choice in ("3", "exit"):
+            console.print("\n[dim]Goodbye! Run 'bbai scan <target>' when you're ready.[/]")
+            return
+        else:
+            # Run setup
+            config = run_setup_wizard()
+            if not config.config_file.exists():
+                console.print("\n[yellow]Setup not completed. Run 'bbai setup' when ready.[/]")
+                return
+            console.print("\n[green]Setup complete! Starting scan...\n")
+    else:
+        config = BBAIConfig.load_with_env()
     
     # Validate target
     safety_manager = create_safety_manager(scope_file, config)
     is_valid, reason = safety_manager.validate_target(target)
     if not is_valid:
-        console.print(f"[red]✗ Target validation failed:[/] {reason}")
+        console.print(f"[red]Target validation failed:[/] {reason}")
+        console.print("\n[dim]Tip: Use 'bbai create-scope-template' to define what targets are allowed.[/]")
         raise typer.Exit(1)
     
     # Show preview if requested
     if preview:
         console.print(Panel(
-            f"[bold cyan]📋 Investigation Plan: {target}[/]\n\n"
+            f"[bold cyan]Investigation Plan: {target}[/]\n\n"
             f"The AI will perform approximately [bold]{iterations}[/] tool executions:\n\n"
             f"[dim]Phase 1:[/] Reconnaissance\n"
             f"  • subfinder - Find subdomains\n"
@@ -324,7 +526,7 @@ def scan(
     
     # Run investigation
     console.print(Panel(
-        f"[bold cyan]🔍 Starting Investigation[/]\n\n"
+        f"[bold cyan]Starting Investigation[/]\n\n"
         f"Target: [bold]{target}[/]\n"
         f"Max iterations: {iterations}\n"
         f"LLM: {config.llm.provider} ({config.llm.model})",
