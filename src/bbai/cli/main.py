@@ -67,7 +67,7 @@ def show_welcome_menu() -> str:
     from rich.prompt import Prompt
     choice = Prompt.ask(
         "What would you like to do?",
-        choices=["1", "2", "3", "4", "demo", "test", "setup", "exit"],
+        choices=["1", "2", "3", "4"],
         default="1"
     )
     
