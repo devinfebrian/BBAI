@@ -113,10 +113,34 @@ BBAI is an AI-driven security testing agent that follows a **ReAct pattern** (Re
 
 ## How It Works
 
+### For New Users
+
+```
+$ bbai
+
+Welcome to BBAI!
+1. Demo Mode      ← Try this first (no setup)
+2. Quick Test     ← Try on safe target
+3. Setup          ← Configure AI provider
+4. Exit
+
+→ Select Demo
+→ See how AI makes decisions
+→ Try a real scan
+```
+
 ### Example Investigation Flow
 
 ```
-User: bbai agent investigate example.com
+$ bbai scan example.com
+
+Starting Investigation
+
+Progress: ████████░░░░░░░░░░░░ 40%
+Strategy: deep_dive
+Hosts: 15 | Endpoints: 47 | Findings: 2 (1 high)
+
+→ Running nuclei on api.example.com
 
 [Iteration 1] Strategy: initial_recon
 AI Reasoning: "Starting fresh. Need to understand attack surface."
@@ -133,16 +157,7 @@ AI Reasoning: "GraphQL detected! Should run GraphQL-specific tests."
 Action: Run nuclei(targets=["api.example.com"], templates=["graphql"])
 Result: Found GraphQL Introspection Enabled (HIGH)
 
-[Iteration 4] Strategy: deep_dive
-AI Reasoning: "Found a confirmed vulnerability. Check admin panel too."
-Action: Run katana(url="admin.example.com", depth=2)
-Result: Crawled 23 endpoints, found /login, /api/internal
-
-[Iteration 5] Strategy: report
-AI Reasoning: "Good coverage achieved. Ready to report findings."
-Action: Report findings
-
-Final Report Generated:
+Final Report:
 - 15 hosts discovered
 - 47 endpoints mapped  
 - 1 HIGH severity finding: GraphQL Introspection
@@ -159,7 +174,7 @@ Final Report Generated:
 - Git (for cloning)
 - Internet connection (for downloading tools)
 
-### Setup
+### Quick Install
 
 ```bash
 # Clone the repository
@@ -169,37 +184,66 @@ cd bbai
 # Install dependencies
 uv pip install -e .
 
-# Run first-time setup (configures LLM)
-bbai setup
-
-# Or start directly (will prompt setup)
+# Start BBAI (interactive menu on first run)
 bbai
-```
-
-### LLM Configuration
-
-BBAI supports multiple LLM providers:
-
-| Provider | Environment Variable | Model |
-|----------|---------------------|-------|
-| Moonshot AI | `MOONSHOT_API_KEY` | kimi-k2-5 |
-| OpenAI | `OPENAI_API_KEY` | gpt-4o |
-| Anthropic | `ANTHROPIC_API_KEY` | claude-3-5-sonnet |
-| Ollama | None (local) | llama3.2, mistral |
-
-Set your API key:
-```bash
-export MOONSHOT_API_KEY="sk-your-key-here"
 ```
 
 ---
 
 ## Usage
 
-### Quick Start (Simplest)
+### First Time? Start Here
+
+When you run `bbai` for the first time, you'll see a welcome menu:
 
 ```bash
-# One-command scan - everything automatic
+$ bbai
+
+┌─────────────────────────────────────────────────────────────┐
+│ Welcome to BBAI!                                            │
+│ AI-powered security testing                                 │
+└─────────────────────────────────────────────────────────────┘
+
+BBAI is an AI agent that finds security vulnerabilities by
+intelligently deciding which tools to run.
+
+┌─────────────────────────────────────────────────────────────┐
+│  # │ Option        │ Description                            │
+├────┼───────────────┼────────────────────────────────────────┤
+│  1 │ Demo Mode     │ See how it works (no setup, no API key)│
+│  2 │ Quick Test    │ Scan a safe test target                │
+│  3 │ Setup         │ Configure AI provider for full use     │
+│  4 │ Exit          │ Close BBAI                             │
+└─────────────────────────────────────────────────────────────┘
+
+What would you like to do? [1/2/3/4]: 
+```
+
+### Option 1: Demo Mode (No Setup Required)
+
+See how BBAI works without any configuration:
+
+```bash
+$ bbai
+# Select "Demo Mode"
+
+[THINK]     Starting fresh. Need to understand the attack surface.
+[ACT]       Run subfinder to find subdomains...
+[OBSERVE]   Found 15 subdomains including api.example.com
+[THINK]     Good baseline. Check which hosts are alive.
+[ACT]       Run httpx to probe discovered hosts...
+[OBSERVE]   api.example.com is alive with GraphQL endpoint!
+[THINK]     GraphQL detected! Switching to deep_dive strategy.
+[ACT]       Run nuclei with GraphQL templates...
+[OBSERVE]   Found: GraphQL Introspection Enabled (HIGH severity)
+```
+
+### Option 2: Quick Scan
+
+Once configured, scanning is simple:
+
+```bash
+# Basic scan
 bbai scan example.com
 
 # Preview what will happen (no actual scan)
@@ -212,6 +256,29 @@ bbai scan example.com --iterations 30
 bbai scan example.com -o report.md
 ```
 
+### LLM Configuration
+
+If you want full functionality, configure an AI provider:
+
+```bash
+# Run setup
+bbai setup
+```
+
+**Supported Providers:**
+
+| Provider | Cost | Setup | Best For |
+|----------|------|-------|----------|
+| **Ollama** | Free | Install locally | Privacy, no API keys |
+| **Moonshot AI** | ~$0.05/scan | API key | Best performance |
+| **OpenAI** | ~$0.10/scan | API key | Reliable |
+| **Anthropic** | ~$0.08/scan | API key | Reasoning |
+
+**Get an API key:**
+- Moonshot AI: https://platform.moonshot.cn/
+- OpenAI: https://platform.openai.com/api-keys
+- Anthropic: https://console.anthropic.com/settings/keys
+
 ### Check Everything is Working
 
 ```bash
@@ -220,26 +287,6 @@ bbai doctor
 
 # Try to fix issues automatically
 bbai doctor --fix
-```
-
-### AI-Driven Investigation (Advanced)
-
-```bash
-# Basic investigation
-bbai agent investigate example.com
-
-# With more iterations (deeper investigation)
-bbai agent investigate example.com --max-iterations 50
-
-# With custom scope file
-bbai agent investigate api.example.com --scope-file ./scope.yaml
-```
-
-### Demo Mode (No Network)
-
-```bash
-# See how the AI makes decisions without running tools
-bbai agent demo
 ```
 
 ### Interactive Shell
