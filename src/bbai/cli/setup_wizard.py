@@ -31,76 +31,86 @@ console = Console()
 
 
 # Provider definitions with models
+# Last updated: 2025-02
+# References:
+#   - Moonshot: https://platform.moonshot.cn/docs/guide/kimi-k2-5-quickstart
+#   - OpenAI: https://platform.openai.com/docs/models
+#   - Anthropic: https://docs.anthropic.com/en/docs/about-claude/models
+#   - Ollama: https://ollama.com/library
+
 PROVIDERS = [
     {
         "id": FactoryLLMProvider.MOONSHOT,
-        "name": "🌙 Moonshot AI",
+        "name": "Moonshot AI (Kimi)",
         "short_name": "Moonshot",
-        "description": "Kimi K2.5 - Excellent for security analysis with 2M token context",
+        "description": "Kimi K2.5 - SOTA model with 256K context, supports thinking mode",
         "models": [
-            ("kimi-k2-5", "Kimi K2.5 (recommended)"),
-            ("kimi-k1-5", "Kimi K1.5 (long context)"),
-            ("kimi-k1", "Kimi K1"),
+            ("kimi-k2.5", "Kimi K2.5 (recommended, 256K context)"),
+            ("kimi-k2-thinking", "Kimi K2.5 Thinking (reasoning mode)"),
+            ("kimi-k2-turbo-preview", "Kimi K2 Turbo Preview"),
         ],
         "requires_key": True,
         "api_key_url": "https://platform.moonshot.cn/",
         "env_var": "MOONSHOT_API_KEY",
+        "pricing": "~$0.05/scan",
     },
     {
         "id": FactoryLLMProvider.OPENAI,
-        "name": "🤖 OpenAI",
+        "name": "OpenAI",
         "short_name": "OpenAI",
-        "description": "GPT-4 series - Reliable and widely used",
+        "description": "GPT-4o and o3-mini - Industry standard models",
         "models": [
-            ("gpt-4o", "GPT-4o (recommended)"),
-            ("gpt-4o-mini", "GPT-4o Mini (faster, cheaper)"),
-            ("gpt-4-turbo", "GPT-4 Turbo"),
-            ("o3-mini", "o3 Mini (reasoning)"),
+            ("gpt-4o", "GPT-4o (recommended, versatile)"),
+            ("o3-mini", "o3-mini (reasoning, best for analysis)"),
+            ("gpt-4o-mini", "GPT-4o Mini (fast, cost-effective)"),
         ],
         "requires_key": True,
         "api_key_url": "https://platform.openai.com/api-keys",
         "env_var": "OPENAI_API_KEY",
+        "pricing": "~$0.08/scan",
     },
     {
         "id": FactoryLLMProvider.ANTHROPIC,
-        "name": "Anthropic",
+        "name": "Anthropic (Claude)",
         "short_name": "Anthropic",
-        "description": "Claude 4 series - Strong reasoning capabilities",
+        "description": "Claude 3.5 Sonnet - Strong reasoning and code analysis",
         "models": [
-            ("claude-opus-4-6", "Claude Opus 4.6 (most intelligent)"),
-            ("claude-sonnet-4-6", "Claude Sonnet 4.6 (recommended)"),
-            ("claude-haiku-4-5", "Claude Haiku 4.5 (fastest)"),
-            ("claude-3-5-sonnet-20241022", "Claude 3.5 Sonnet (legacy)"),
+            ("claude-3-5-sonnet-20241022", "Claude 3.5 Sonnet (recommended)"),
+            ("claude-3-opus-20240229", "Claude 3 Opus (most capable)"),
+            ("claude-3-haiku-20240307", "Claude 3 Haiku (fastest)"),
         ],
         "requires_key": True,
         "api_key_url": "https://console.anthropic.com/settings/keys",
         "env_var": "ANTHROPIC_API_KEY",
+        "pricing": "~$0.10/scan",
     },
     {
         "id": FactoryLLMProvider.OLLAMA,
-        "name": "🏠 Ollama (Local)",
+        "name": "Ollama (Local)",
         "short_name": "Ollama",
-        "description": "Run models locally - Free and private",
+        "description": "Run models locally - Free, private, no API keys needed",
         "models": [
-            ("llama3.2", "Llama 3.2 (recommended)"),
-            ("llama3.1", "Llama 3.1"),
-            ("mistral", "Mistral"),
-            ("codellama", "CodeLlama"),
-            ("qwen2.5", "Qwen 2.5"),
+            ("llama3.3", "Llama 3.3 70B (SOTA, requires 48GB+ RAM)"),
+            ("qwen2.5", "Qwen 2.5 (good balance, 7B-72B)"),
+            ("llama3.2", "Llama 3.2 (lightweight, 1B-3B)"),
+            ("deepseek-r1", "DeepSeek-R1 (reasoning, 7B-32B)"),
+            ("codellama", "CodeLlama (code-focused)"),
         ],
         "requires_key": False,
         "api_key_url": None,
         "env_var": None,
+        "pricing": "Free (runs on your hardware)",
     },
     {
         "id": FactoryLLMProvider.MOCK,
-        "name": "🧪 Mock (Testing)",
+        "name": "Mock (Demo Mode)",
         "short_name": "Mock",
-        "description": "Mock responses for testing without API costs",
-        "models": [("mock-model", "Mock Model")],
+        "description": "Mock responses for testing without API costs or network",
+        "models": [("mock-model", "Mock Model (for testing)")],
         "requires_key": False,
         "api_key_url": None,
         "env_var": None,
+        "pricing": "Free",
     },
 ]
 

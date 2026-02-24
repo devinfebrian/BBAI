@@ -33,8 +33,8 @@ class LLMProvider(str, Enum):
     def get_display_name(cls, provider: str) -> str:
         """Get human-readable display name for provider."""
         names = {
-            cls.MOONSHOT: "Moonshot AI (Kimi K2.5)",
-            cls.OPENAI: "OpenAI (GPT-4/GPT-3.5)",
+            cls.MOONSHOT: "Moonshot AI (Kimi K)",
+            cls.OPENAI: "OpenAI (GPT)",
             cls.ANTHROPIC: "Anthropic (Claude)",
             cls.OLLAMA: "Ollama (Local Models)",
             cls.OPENAI_COMPATIBLE: "OpenAI-Compatible API",
@@ -45,11 +45,12 @@ class LLMProvider(str, Enum):
     @classmethod
     def get_default_models(cls, provider: str) -> list[str]:
         """Get default models for a provider."""
+        # Updated: 2025-02 with latest model versions
         models = {
-            cls.MOONSHOT: ["kimi-k2-5", "kimi-k1-5", "kimi-k1"],
-            cls.OPENAI: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o3-mini"],
-            cls.ANTHROPIC: ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5", "claude-3-5-sonnet-20241022"],
-            cls.OLLAMA: ["llama3.2", "llama3.1", "mistral", "codellama", "qwen2.5"],
+            cls.MOONSHOT: ["kimi-k2.5", "kimi-k2-thinking", "kimi-k2-turbo-preview"],
+            cls.OPENAI: ["gpt-4o", "o3-mini", "gpt-4o-mini"],
+            cls.ANTHROPIC: ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229", "claude-3-haiku-20240307"],
+            cls.OLLAMA: ["llama3.3", "qwen2.5", "llama3.2", "deepseek-r1", "codellama"],
             cls.OPENAI_COMPATIBLE: ["custom-model"],
             cls.MOCK: ["mock-model"],
         }
@@ -77,12 +78,12 @@ class LLMProvider(str, Enum):
     def get_description(cls, provider: str) -> str:
         """Get description for provider."""
         descriptions = {
-            cls.MOONSHOT: "Kimi K2.5 - Excellent for security analysis with long context",
-            cls.OPENAI: "GPT-4 series - Reliable and widely used",
-            cls.ANTHROPIC: "Claude 3.5 Sonnet - Strong reasoning capabilities",
-            cls.OLLAMA: "Run models locally - Free and private (requires Ollama installed)",
+            cls.MOONSHOT: "Kimi K2.5 - SOTA model with 256K context, supports thinking mode",
+            cls.OPENAI: "GPT-4o and o3-mini - Industry standard models for analysis",
+            cls.ANTHROPIC: "Claude 3.5 Sonnet - Strong reasoning and code analysis",
+            cls.OLLAMA: "Run models locally - Free, private, no API keys needed",
             cls.OPENAI_COMPATIBLE: "Custom OpenAI-compatible endpoint (LocalAI, vLLM, etc.)",
-            cls.MOCK: "Mock responses for testing without API costs",
+            cls.MOCK: "Mock responses for testing without API costs or network",
         }
         return descriptions.get(provider, "")
 

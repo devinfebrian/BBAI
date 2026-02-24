@@ -267,12 +267,21 @@ bbai setup
 
 **Supported Providers:**
 
-| Provider | Cost | Setup | Best For |
-|----------|------|-------|----------|
-| **Ollama** | Free | Install locally | Privacy, no API keys |
-| **Moonshot AI** | ~$0.05/scan | API key | Best performance |
-| **OpenAI** | ~$0.10/scan | API key | Reliable |
-| **Anthropic** | ~$0.08/scan | API key | Reasoning |
+| Provider | Recommended Model | Cost | Context | Best For |
+|----------|-------------------|------|---------|----------|
+| **Moonshot AI** | `kimi-k2.5` | ~¥0.05/scan | 256K | Best performance, supports thinking mode |
+| **OpenAI** | `gpt-4o` / `o3-mini` | ~$0.08/scan | 128K | Industry standard, reasoning capabilities |
+| **Anthropic** | `claude-3-5-sonnet` | ~$0.10/scan | 200K | Strong reasoning, code analysis |
+| **Ollama** | `llama3.3` / `qwen2.5` | Free | varies | Privacy, runs locally, no API keys |
+
+**Available Models:**
+
+| Provider | Models |
+|----------|--------|
+| Moonshot | `kimi-k2.5` (recommended), `kimi-k2-thinking`, `kimi-k2-turbo-preview` |
+| OpenAI | `gpt-4o` (recommended), `o3-mini` (reasoning), `gpt-4o-mini` (fast) |
+| Anthropic | `claude-3-5-sonnet-20241022` (recommended), `claude-3-opus`, `claude-3-haiku` |
+| Ollama | `llama3.3`, `qwen2.5`, `llama3.2`, `deepseek-r1`, `codellama` |
 
 **Get an API key:**
 - Moonshot AI: https://platform.moonshot.cn/
