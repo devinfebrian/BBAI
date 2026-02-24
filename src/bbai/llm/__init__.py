@@ -15,6 +15,8 @@ Supported providers:
 from bbai.llm.factory import (
     LLMProvider,
     create_llm_client,
+    fetch_models,
+    fetch_models_sync,
     get_available_providers,
 )
 from bbai.llm.providers import (
@@ -63,6 +65,8 @@ __all__ = [
     # Factory (new multi-provider)
     "LLMProvider",
     "create_llm_client",
+    "fetch_models",
+    "fetch_models_sync",
     "get_available_providers",
     # Providers
     "BaseLLMClient",

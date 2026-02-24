@@ -151,17 +151,63 @@ def select_provider() -> dict:
     return selected
 
 
-def select_model(provider: dict) -> str:
-    """Select model with custom option."""
-    models = provider['models']
+async def fetch_models_for_provider(provider: dict, api_key: str | None = None) -> list[dict]:
+    """Fetch models dynamically from provider API.
+    
+    Falls back to hardcoded defaults if fetching fails.
+    """
+    from bbai.llm.factory import fetch_models
+    
+    provider_id = provider['id']
+    
+    # Don't fetch for providers that don't support it well
+    if provider_id == 'mock':
+        return [{"id": "mock-model", "name": "Mock Model", "description": "For testing"}]
+    
+    try:
+        console.print(f"[dim]Fetching available models from {provider['short_name']}...[/]")
+        models = await fetch_models(
+            provider=provider_id,
+            api_key=api_key,
+        )
+        if models:
+            console.print(f"[green]OK[/] Found {len(models)} models")
+            return models
+    except Exception as e:
+        console.print(f"[yellow]Could not fetch models: {e}[/]")
+    
+    # Fallback to hardcoded models
+    console.print(f"[dim]Using default model list[/]")
+    return [{"id": m[0], "name": m[0], "description": m[1]} for m in provider['models']]
+
+
+def select_model(provider: dict, models: list[dict] | None = None) -> str:
+    """Select model with custom option.
+    
+    Args:
+        provider: Provider configuration dict
+        models: List of model dicts from API fetch (optional)
+    """
+    if models is None:
+        models = [{"id": m[0], "name": m[0], "description": m[1]} for m in provider['models']]
     
     # Build choices: models + separator + custom option
     choices = []
-    for model_id, description in models:
-        choices.append(questionary.Choice(
-            title=f"{model_id} - {description}",
-            value=model_id,
-        ))
+    for model in models:
+        model_id = model["id"]
+        description = model.get("description", "")
+        context = model.get("context_length")
+        
+        # Format context length nicely
+        context_str = ""
+        if context:
+            if context >= 1000:
+                context_str = f" ({context//1000}K context)"
+            else:
+                context_str = f" ({context} context)"
+        
+        title = f"{model_id} - {description}{context_str}"
+        choices.append(questionary.Choice(title=title, value=model_id))
     
     # Add separator and custom option
     choices.append(questionary.Separator())
@@ -170,10 +216,12 @@ def select_model(provider: dict) -> str:
         value="__custom__",
     ))
     
+    default = models[0]["id"] if models else None
+    
     selected = questionary.select(
         f"Select {provider['short_name']} model:",
         choices=choices,
-        default=models[0][0] if models else None,
+        default=default,
     ).ask()
     
     if selected is None:
@@ -380,8 +428,8 @@ def confirm_setup(config: BBAIConfig, storage_method: str) -> bool:
     return questionary.confirm("Save this configuration?", default=True).ask()
 
 
-def run_setup_wizard(force: bool = False) -> BBAIConfig:
-    """Run the interactive setup wizard."""
+async def run_setup_wizard_async(force: bool = False) -> BBAIConfig:
+    """Run the interactive setup wizard (async version)."""
     # Check if already configured
     existing_config = BBAIConfig.load()
     if not force and existing_config.config_file.exists():
@@ -396,13 +444,16 @@ def run_setup_wizard(force: bool = False) -> BBAIConfig:
         # Step 1: Select provider
         provider = select_provider()
         
-        # Step 2: Select model
-        model = select_model(provider)
-        
-        # Step 3: Enter API key
+        # Step 2: Enter API key (needed to fetch models)
         api_key = input_api_key(provider)
         
-        # Step 4: Test API key (if entered)
+        # Step 3: Fetch models dynamically
+        models = await fetch_models_for_provider(provider, api_key)
+        
+        # Step 4: Select model from fetched list
+        model = select_model(provider, models)
+        
+        # Step 5: Test API key (if entered)
         storage_method = "env"
         if api_key:
             test_result = test_api_key(provider['id'], model, api_key)
@@ -414,10 +465,10 @@ def run_setup_wizard(force: bool = False) -> BBAIConfig:
                 if not proceed:
                     return existing_config
             
-            # Step 5: Select storage method
+            # Step 6: Select storage method
             api_key, storage_method = select_storage_method(provider, api_key)
         
-        # Step 6: Build and save config
+        # Step 7: Build and save config
         llm_config = LLMProviderConfig(
             provider=provider['id'],
             model=model,
@@ -451,6 +502,12 @@ def run_setup_wizard(force: bool = False) -> BBAIConfig:
     except KeyboardInterrupt:
         console.print("\n\n[yellow]Setup cancelled.[/]")
         return existing_config
+
+
+def run_setup_wizard(force: bool = False) -> BBAIConfig:
+    """Run the interactive setup wizard."""
+    import asyncio
+    return asyncio.run(run_setup_wizard_async(force))
 
 
 def check_first_run() -> bool:

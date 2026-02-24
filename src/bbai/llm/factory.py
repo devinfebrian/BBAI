@@ -167,3 +167,92 @@ def get_available_providers() -> list[dict[str, str]]:
             "api_key_env": LLMProvider.get_api_key_env(provider.value),
         })
     return providers
+
+
+async def fetch_models(
+    provider: str,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    use_cache: bool = True,
+) -> list[dict[str, Any]]:
+    """Fetch available models from a provider API.
+    
+    Fetches models dynamically from the provider's API. Falls back to
+    default hardcoded models if the API call fails.
+    
+    Args:
+        provider: Provider identifier (e.g., "openai", "moonshot")
+        api_key: API key for authentication (optional for some providers)
+        base_url: Custom base URL (optional)
+        use_cache: Whether to use cached results (not implemented yet)
+        
+    Returns:
+        List of model info dictionaries with keys:
+        - id: Model identifier string
+        - name: Human-readable name
+        - description: Model description
+        - context_length: Context window size
+        
+    Examples:
+        # Fetch OpenAI models
+        models = await fetch_models("openai", api_key="sk-...")
+        
+        # Fetch Ollama models (no API key needed)
+        models = await fetch_models("ollama")
+        
+        # Fetch with fallback on error
+        try:
+            models = await fetch_models("openai", api_key=key)
+        except Exception:
+            models = LLMProvider.get_default_models("openai")
+    """
+    import os
+    
+    provider_enum = LLMProvider(provider)
+    client_class = PROVIDER_CLIENT_MAP.get(provider_enum)
+    
+    if not client_class:
+        raise ValueError(f"Unsupported provider: {provider}")
+    
+    # Get API key from environment if not provided
+    if api_key is None and LLMProvider.requires_api_key(provider):
+        env_var = LLMProvider.get_api_key_env(provider)
+        api_key = os.environ.get(env_var)
+    
+    # Create temporary client
+    client = client_class(
+        api_key=api_key,
+        base_url=base_url,
+        model="",  # Not needed for listing
+    )
+    
+    try:
+        models = await client.list_models()
+        return models
+    except Exception:
+        # Fallback to default models
+        default_models = LLMProvider.get_default_models(provider)
+        return [
+            {
+                "id": m,
+                "name": m,
+                "description": f"Default {provider} model",
+                "context_length": None,
+            }
+            for m in default_models
+        ]
+    finally:
+        await client.close()
+
+
+def fetch_models_sync(
+    provider: str,
+    api_key: str | None = None,
+    base_url: str | None = None,
+) -> list[dict[str, Any]]:
+    """Synchronous version of fetch_models.
+    
+    Convenience wrapper for non-async contexts.
+    """
+    import asyncio
+    return asyncio.run(fetch_models(provider, api_key, base_url))

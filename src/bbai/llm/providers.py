@@ -106,6 +106,22 @@ class BaseLLMClient(ABC):
         """
         pass
 
+    async def list_models(self) -> list[dict[str, Any]]:
+        """List available models from the provider.
+        
+        Returns:
+            List of model info dictionaries with keys:
+            - id: Model identifier
+            - name: Human-readable name (optional)
+            - description: Model description (optional)
+            - context_length: Context window size (optional)
+        
+        Raises:
+            NotImplementedError: If provider doesn't support model listing
+            httpx.HTTPError: If API request fails
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} does not support listing models")
+
     def _get_api_key(self) -> str | None:
         """Get API key from parameter or environment."""
         if self.api_key:
@@ -361,6 +377,58 @@ class MoonshotClient(BaseLLMClient):
         model = data.get("model", self._get_model())
         return content, model
 
+    async def list_models(self) -> list[dict[str, Any]]:
+        """List available models from Moonshot API.
+        
+        https://platform.moonshot.cn/docs/api/models#list-models
+        """
+        client = self._get_client()
+        response = await client.get("/models")
+        response.raise_for_status()
+        data = response.json()
+        
+        models = []
+        for model in data.get("data", []):
+            model_id = model.get("id", "")
+            models.append({
+                "id": model_id,
+                "name": model.get("display_name") or model_id,
+                "description": self._get_moonshot_model_description(model_id),
+                "context_length": model.get("context_length") or 256000,
+            })
+        
+        # Sort by preference
+        models.sort(key=lambda m: self._moonshot_model_priority(m["id"]), reverse=True)
+        return models
+    
+    def _get_moonshot_model_description(self, model_id: str) -> str:
+        """Get description for Moonshot model."""
+        descriptions = {
+            "kimi-k2.5": "Kimi K2.5 - State-of-the-art with 256K context",
+            "kimi-k2-thinking": "Kimi K2.5 Thinking - Extended reasoning mode",
+            "kimi-k2-turbo-preview": "Kimi K2 Turbo Preview - Fast and efficient",
+            "kimi-k1.5": "Kimi K1.5 - Long context specialist",
+            "kimi-k1": "Kimi K1 - Long context model",
+        }
+        for key, desc in descriptions.items():
+            if key in model_id.lower():
+                return desc
+        return "Moonshot AI model"
+    
+    def _moonshot_model_priority(self, model_id: str) -> int:
+        """Get priority for sorting (higher = first)."""
+        priorities = {
+            "kimi-k2.5": 100,
+            "kimi-k2-thinking": 95,
+            "kimi-k2-turbo": 90,
+            "kimi-k1.5": 80,
+            "kimi-k1": 70,
+        }
+        for key, priority in priorities.items():
+            if key in model_id.lower():
+                return priority
+        return 0
+
 
 class OpenAIClient(BaseLLMClient):
     """OpenAI API client (GPT-4, GPT-3.5)."""
@@ -399,6 +467,84 @@ class OpenAIClient(BaseLLMClient):
         content = message.get("content", "")
         model = data.get("model", self._get_model())
         return content, model
+
+    async def list_models(self) -> list[dict[str, Any]]:
+        """List available models from OpenAI API.
+        
+        https://platform.openai.com/docs/api-reference/models/list
+        """
+        client = self._get_client()
+        response = await client.get("/models")
+        response.raise_for_status()
+        data = response.json()
+        
+        models = []
+        for model in data.get("data", []):
+            model_id = model.get("id", "")
+            # Filter for chat completion models (exclude embeddings, audio, etc.)
+            if any(x in model_id for x in ["gpt-", "o1", "o3", "chatgpt"]):
+                models.append({
+                    "id": model_id,
+                    "name": model.get("display_name") or model_id,
+                    "description": self._get_openai_model_description(model_id),
+                    "context_length": self._get_openai_context_length(model_id),
+                    "created": model.get("created"),
+                })
+        
+        # Sort by preference (newer/better models first)
+        models.sort(key=lambda m: self._openai_model_priority(m["id"]), reverse=True)
+        return models
+    
+    def _get_openai_model_description(self, model_id: str) -> str:
+        """Get description for OpenAI model."""
+        descriptions = {
+            "gpt-4o": "Most capable multimodal model (GPT-4 Optimized)",
+            "gpt-4o-mini": "Fast, cost-effective multimodal model",
+            "o3-mini": "Reasoning model optimized for coding and STEM",
+            "o1": "Advanced reasoning model",
+            "o1-mini": "Faster reasoning model",
+            "gpt-4-turbo": "Previous generation GPT-4",
+            "gpt-4": "Original GPT-4",
+            "gpt-3.5-turbo": "Fast, cost-effective for simple tasks",
+        }
+        for key, desc in descriptions.items():
+            if key in model_id:
+                return desc
+        return "OpenAI model"
+    
+    def _get_openai_context_length(self, model_id: str) -> int:
+        """Get context length for OpenAI model."""
+        context_lengths = {
+            "gpt-4o": 128000,
+            "gpt-4o-mini": 128000,
+            "o3-mini": 200000,
+            "o1": 200000,
+            "o1-mini": 128000,
+            "gpt-4-turbo": 128000,
+            "gpt-4": 8192,
+            "gpt-3.5-turbo": 16385,
+        }
+        for key, length in context_lengths.items():
+            if key in model_id:
+                return length
+        return 4096  # Default
+    
+    def _openai_model_priority(self, model_id: str) -> int:
+        """Get priority for sorting (higher = first)."""
+        priorities = {
+            "gpt-4o": 100,
+            "o3-mini": 95,
+            "o1": 90,
+            "gpt-4o-mini": 85,
+            "o1-mini": 80,
+            "gpt-4-turbo": 70,
+            "gpt-4": 60,
+            "gpt-3.5-turbo": 50,
+        }
+        for key, priority in priorities.items():
+            if key in model_id:
+                return priority
+        return 0
 
 
 class AnthropicClient(BaseLLMClient):
@@ -452,6 +598,55 @@ class AnthropicClient(BaseLLMClient):
         model = data.get("model", self._get_model())
         return content, model
 
+    async def list_models(self) -> list[dict[str, Any]]:
+        """List available models from Anthropic API.
+        
+        Note: Anthropic doesn't have a public /models endpoint yet.
+        Returns hardcoded list of current models with metadata.
+        
+        https://docs.anthropic.com/en/docs/about-claude/models
+        """
+        # Anthropic doesn't expose a models endpoint, so we return known models
+        # This list should be updated periodically
+        models = [
+            {
+                "id": "claude-3-5-sonnet-20241022",
+                "name": "Claude 3.5 Sonnet (New)",
+                "description": "Most intelligent model - best for complex tasks",
+                "context_length": 200000,
+                "created": 1729728000,
+            },
+            {
+                "id": "claude-3-5-sonnet-20240620",
+                "name": "Claude 3.5 Sonnet (Old)",
+                "description": "Previous version of Claude 3.5 Sonnet",
+                "context_length": 200000,
+                "created": 1718841600,
+            },
+            {
+                "id": "claude-3-opus-20240229",
+                "name": "Claude 3 Opus",
+                "description": "Powerful model for highly complex tasks",
+                "context_length": 200000,
+                "created": 1709164800,
+            },
+            {
+                "id": "claude-3-sonnet-20240229",
+                "name": "Claude 3 Sonnet",
+                "description": "Balance of intelligence and speed",
+                "context_length": 200000,
+                "created": 1709164800,
+            },
+            {
+                "id": "claude-3-haiku-20240307",
+                "name": "Claude 3 Haiku",
+                "description": "Fastest model for lightweight actions",
+                "context_length": 200000,
+                "created": 1709769600,
+            },
+        ]
+        return models
+
 
 class OllamaClient(BaseLLMClient):
     """Ollama local API client."""
@@ -489,6 +684,63 @@ class OllamaClient(BaseLLMClient):
         content = message.get("content", "")
         model = data.get("model", self._get_model())
         return content, model
+
+    async def list_models(self) -> list[dict[str, Any]]:
+        """List available models from Ollama API.
+        
+        https://ollama.com/docs/api#list-local-models
+        """
+        # Ollama uses a different endpoint structure
+        base_url = self._get_base_url().replace("/v1", "")  # Remove /v1 suffix
+        
+        async with httpx.AsyncClient(base_url=base_url, timeout=self.timeout) as client:
+            response = await client.get("/api/tags")
+            response.raise_for_status()
+            data = response.json()
+        
+        models = []
+        for model in data.get("models", []):
+            model_name = model.get("name", "")
+            models.append({
+                "id": model_name,
+                "name": model_name,
+                "description": self._get_ollama_model_description(model_name),
+                "context_length": self._get_ollama_context_length(model_name),
+                "size": model.get("size"),
+                "modified_at": model.get("modified_at"),
+            })
+        
+        # Sort alphabetically
+        models.sort(key=lambda m: m["id"])
+        return models
+    
+    def _get_ollama_model_description(self, model_id: str) -> str:
+        """Get description for Ollama model."""
+        descriptions = {
+            "llama3.3": "Meta's Llama 3.3 70B - State-of-the-art open model",
+            "llama3.2": "Meta's Llama 3.2 (1B-3B) - Lightweight, efficient",
+            "llama3.1": "Meta's Llama 3.1 (8B-405B) - Strong general performance",
+            "qwen2.5": "Alibaba's Qwen 2.5 - Excellent multilingual model",
+            "deepseek-r1": "DeepSeek-R1 - Reasoning-focused model",
+            "codellama": "Meta's CodeLlama - Code-specialized model",
+            "mistral": "Mistral AI's model - Strong performance",
+            "mixtral": "Mistral's MoE model - Powerful but large",
+            "phi4": "Microsoft's Phi-4 - Small but capable",
+            "gemma2": "Google's Gemma 2 - Open models by Google",
+        }
+        for key, desc in descriptions.items():
+            if key in model_id.lower():
+                return desc
+        return "Local Ollama model"
+    
+    def _get_ollama_context_length(self, model_id: str) -> int:
+        """Get context length for Ollama model."""
+        # Most modern models support at least 8K, many support 128K
+        if any(x in model_id.lower() for x in ["llama3", "qwen2.5", "mistral", "mixtral"]):
+            return 128000
+        elif "deepseek" in model_id.lower():
+            return 64000
+        return 8192  # Default
 
 
 class OpenAICompatibleClient(OpenAIClient):
@@ -537,6 +789,17 @@ class MockLLMClient(BaseLLMClient):
 
     def _extract_response_content(self, data: dict[str, Any]) -> tuple[str, str]:
         return "", ""
+
+    async def list_models(self) -> list[dict[str, Any]]:
+        """Return mock models."""
+        return [
+            {
+                "id": "mock-model",
+                "name": "Mock Model",
+                "description": "Mock model for testing",
+                "context_length": 4096,
+            }
+        ]
 
     async def complete(
         self,
