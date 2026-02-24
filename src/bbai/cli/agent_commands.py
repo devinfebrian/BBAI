@@ -15,7 +15,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 from bbai.agent import SecurityAgent, generate_report
-from bbai.cli.setup_wizard import ensure_configured
+from bbai.cli.setup_wizard import ensure_configured, SetupCancelledError
 from bbai.core.safety_manager import create_safety_manager
 
 # Create Typer app for agent commands
@@ -73,7 +73,11 @@ def investigate(
         bbai agent investigate example.com -o report.md
     """
     # Ensure BBAI is configured
-    config = ensure_configured()
+    try:
+        config = ensure_configured()
+    except SetupCancelledError as e:
+        console.print(f"\n[yellow]{e}[/]")
+        raise typer.Exit(1)
     
     # Create safety manager
     safety_manager = create_safety_manager(scope_file, config)

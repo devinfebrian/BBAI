@@ -27,6 +27,16 @@ if TYPE_CHECKING:
     pass
 
 
+class SetupCancelledError(Exception):
+    """Raised when user cancels the setup process."""
+    pass
+
+
+class SetupFailedError(Exception):
+    """Raised when setup fails to complete successfully."""
+    pass
+
+
 console = Console()
 
 
@@ -517,7 +527,11 @@ def check_first_run() -> bool:
 
 
 def ensure_configured() -> BBAIConfig:
-    """Ensure BBAI is configured, running setup if needed."""
+    """Ensure BBAI is configured, running setup if needed.
+    
+    Raises:
+        SetupCancelledError: If user cancels setup or setup fails
+    """
     if check_first_run():
         console.print(Panel(
             "[bold cyan]Welcome to BBAI![/]\n\n"
@@ -525,7 +539,17 @@ def ensure_configured() -> BBAIConfig:
             border_style="blue",
         ))
         console.print()
-        return run_setup_wizard()
+        config = run_setup_wizard()
+        
+        # Check if setup actually completed (config file exists)
+        if not check_first_run():
+            return config
+        else:
+            # Setup was cancelled or failed - config file doesn't exist
+            raise SetupCancelledError(
+                "Setup was not completed. BBAI requires configuration to run.\n"
+                "Run 'bbai setup' to configure when ready."
+            )
     
     return BBAIConfig.load_with_env()
 

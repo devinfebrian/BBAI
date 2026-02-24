@@ -9,7 +9,7 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
-from bbai.cli.setup_wizard import ensure_configured, run_setup_wizard
+from bbai.cli.setup_wizard import ensure_configured, run_setup_wizard, SetupCancelledError
 from bbai.cli.shell import start_shell
 from bbai.cli.tools_commands import app as tools_app
 from bbai.core.config_models import BBAIConfig
@@ -234,7 +234,12 @@ def main(
             
             if choice == "setup":
                 console.print()
-                run_setup_wizard()
+                config = run_setup_wizard()
+                
+                # Check if setup was actually completed
+                if not config or (hasattr(config, 'config_file') and not config.config_file.exists()):
+                    console.print("\n[yellow]Setup was not completed. Run 'bbai setup' when ready.[/]")
+                    return
                 
                 # After setup, ask if they want to try a scan
                 console.print()
@@ -275,7 +280,11 @@ def shell(
         bbai shell --project mytarget
     """
     # Ensure configuration is set up
-    config = ensure_configured()
+    try:
+        config = ensure_configured()
+    except SetupCancelledError as e:
+        console.print(f"\n[yellow]{e}[/]")
+        raise typer.Exit(1)
     
     if project:
         config = config.model_copy(update={"projects_dir": Path(project)})

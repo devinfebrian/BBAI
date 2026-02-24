@@ -381,13 +381,7 @@ class BBAIConfig(BaseModel):
             return Path(v)
         return v
 
-    @model_validator(mode="after")
-    def ensure_directories(self) -> BBAIConfig:
-        """Ensure data directories exist."""
-        self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.projects_dir.mkdir(parents=True, exist_ok=True)
-        self.logs_dir.mkdir(parents=True, exist_ok=True)
-        return self
+
 
     @property
     def config_file(self) -> Path:
