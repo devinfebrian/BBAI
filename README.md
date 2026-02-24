@@ -43,61 +43,61 @@ BBAI is an AI-driven security testing agent that follows a **ReAct pattern** (Re
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│ USER INTERFACE (CLI)                                                             │
+│ USER INTERFACE (CLI)                                                            │
 │  bbai agent investigate example.com --max-iterations 30                         │
 └─────────────────────────────────────────────────┬───────────────────────────────┘
                                                   │
                                                   ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│ SAFETY LAYER                                                                     │
-│  • Validate target against scope rules                                           │
+│ SAFETY LAYER                                                                    │
+│  • Validate target against scope rules                                          │
 │  • Block private IPs (10.x.x.x, 192.168.x.x)                                    │
-│  • Check rate limits                                                             │
+│  • Check rate limits                                                            │
 └─────────────────────────────────────────────────┬───────────────────────────────┘
                                                   │ ALLOWED
                                                   ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│ AI AGENT LOOP                                                                    │
-│                                                                                  │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐      │
-│  │   THINK     │───→│    ACT      │───→│  OBSERVE    │───→│   REPEAT    │      │
-│  │             │    │             │    │             │    │   (or END)  │      │
-│  │ LLM decides │    │ Run tool    │    │ Parse &     │    │             │      │
-│  │ next action │    │ via registry│    │ update state│    │             │      │
-│  └─────────────┘    └──────┬──────┘    └─────────────┘    └─────────────┘      │
+│ AI AGENT LOOP                                                                   │
+│                                                                                 │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐       │
+│  │   THINK     │───→│    ACT      │───→│  OBSERVE    │───→│   REPEAT    │       │
+│  │             │    │             │    │             │    │   (or END)  │       │
+│  │ LLM decides │    │ Run tool    │    │ Parse &     │    │             │       │
+│  │ next action │    │ via registry│    │ update state│    │             │       │
+│  └─────────────┘    └──────┬──────┘    └─────────────┘    └─────────────┘       │
 │         ▲                  │                                       │            │
 │         └──────────────────┴───────────────────────────────────────┘            │
 │                            (Loop up to 30 iterations)                           │
-│                                                                                  │
-│  STATE TRACKED:                                                                  │
-│  • hosts discovered (with tech stack)                                            │
+│                                                                                 │
+│  STATE TRACKED:                                                                 │
+│  • hosts discovered (with tech stack)                                           │
 │  • endpoints found (APIs, forms, etc.)                                          │
-│  • vulnerabilities identified                                                    │
-│  • previous actions & observations                                               │
-│                                                                                  │
+│  • vulnerabilities identified                                                   │
+│  • previous actions & observations                                              │
+│                                                                                 │
 └─────────────────────────────────────────────────┬───────────────────────────────┘
                                                   │ ToolDecision
                                                   │ {tool_name, params}
                                                   ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│ TOOL REGISTRY                                                                    │
-│  • Validates AI input against Pydantic schemas                                   │
-│  • Translates AI intent → CLI commands                                           │
-│  • Routes to appropriate tool wrapper                                            │
+│ TOOL REGISTRY                                                                   │
+│  • Validates AI input against Pydantic schemas                                  │
+│  • Translates AI intent → CLI commands                                          │
+│  • Routes to appropriate tool wrapper                                           │
 └─────────────────────────────────────────────────┬───────────────────────────────┘
                                                   │
                                                   ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│ BINARY WRAPPERS                                                                  │
-│                                                                                  │
+│ BINARY WRAPPERS                                                                 │
+│                                                                                 │
 │  subfinder  →  Download from GitHub  →  Run: subfinder -d target -json          │
 │  httpx      →  Download from GitHub  →  Run: httpx -u target -tech-detect       │
 │  katana     →  Download from GitHub  →  Run: katana -u target -json             │
 │  nuclei     →  Download from GitHub  →  Run: nuclei -u target -t templates      │
-│                                                                                  │
-│  Binary Location: ~/.bbai/tools/                                                 │
-│  Auto-downloaded on first use (~200 MB total)                                    │
-│                                                                                  │
+│                                                                                 │
+│  Binary Location: ~/.bbai/tools/                                                │
+│  Auto-downloaded on first use (~200 MB total)                                   │
+│                                                                                 │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -447,7 +447,7 @@ block_private_ips: true
 
 ## Future Improvements
 
-### Short Term (Next 2-4 weeks)
+### Short Term 
 
 1. **State Persistence**
    - SQLite storage for investigation state
@@ -467,7 +467,7 @@ block_private_ips: true
    - naabu (port scanning)
    - trufflehog (secrets)
 
-### Medium Term (1-3 months)
+### Medium Term 
 
 1. **Human-in-the-Loop**
    - Pause for approval on critical findings
@@ -487,7 +487,7 @@ block_private_ips: true
    - Real-time progress visualization
    - Historical investigation browser
 
-### Long Term (3-6 months)
+### Long Term 
 
 1. **Custom Tool Integration**
    - Plugin system for custom tools
